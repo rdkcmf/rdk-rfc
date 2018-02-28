@@ -1,0 +1,10 @@
+<environment>
+  <components>
+    <rfc>
+      <dependencies>sdk, qt, yajl</dependencies>
+      <is_coverity_supported>True</is_coverity_supported> 
+    </rfc>
+
+  </components>
+</environment>
+

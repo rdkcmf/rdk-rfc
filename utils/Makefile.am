@@ -16,11 +16,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 ##########################################################################
-bin_PROGRAMS = tr181Set rfctool
+
+bin_PROGRAMS =
+if ENABLE_TR181SET_APP
+bin_PROGRAMS += tr181Set
+endif
+
+if ENABLE_RFCTOOL_APP
+bin_PROGRAMS += rfctool
+endif
+
 tr181Set_SOURCES = trsetutils.cpp
 tr181Set_LDADD = -lIARMBus
 tr181Set_CPPFLAGS = -std=c++0x -Wall -I$(PKG_CONFIG_SYSROOT_DIR)${includedir}/rdk/iarmbus -I$(PKG_CONFIG_SYSROOT_DIR)${includedir}/rdk/tr69hostif
 
 rfctool_SOURCES = jsonhandler.cpp
-rfctool_LDADD = -lcjson
-rfctool_CPPFLAGS = -std=c++0x -Wall -I$(PKG_CONFIG_SYSROOT_DIR)${includedir}/cjson
+rfctool_LDADD = ${cjson_LIBS}
+rfctool_CPPFLAGS = -std=c++0x -Wall ${cjson_CFLAGS}

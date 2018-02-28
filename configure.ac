@@ -31,11 +31,41 @@ AC_PROG_CXX
 AC_PROG_CC
 
 # Checks for libraries.
-AC_CHECK_LIB([IARMBus], [IARM_Bus_Init])
-AC_CHECK_LIB([cjson], [cJSON_Parse])
+PKG_CHECK_MODULES([cjson],[cjson >= 0.0])
 
 # Checks for header files.
 AC_CHECK_HEADERS([stdlib.h string.h unistd.h])
+
+#check what all tools are enabled. rfctool by default
+ENABLE_RFCTOOL_APP=true
+#only for yocto builds.
+ENABLE_TR181SET_APP=" "
+
+AC_ARG_ENABLE([rfctool],
+              AS_HELP_STRING([--enable-rfctool],[enable rfctool app (default is yes)]),
+              [
+                case "${enableval}" in
+                 yes) ENABLE_RFCTOOL_APP=true;;
+                  no) ENABLE_RFCTOOL_APP=" ";
+                      AC_MSG_ERROR([RFC tool app is disabled]) ;;
+                   *) AC_MSG_ERROR([bad value ${enableval} for --enable-rfctool]) ;;
+                esac
+              ],
+              [echo "rfctool app is disabled"])
+AM_CONDITIONAL([ENABLE_RFCTOOL_APP], [test x$ENABLE_RFCTOOL_APP = xtrue])
+
+AC_ARG_ENABLE([tr181set],
+              AS_HELP_STRING([--enable-tr181set],[enable tr181 client app (default is no)]),
+              [
+                case "${enableval}" in
+                 yes) ENABLE_TR181SET_APP=true;;
+                  no) AC_MSG_ERROR([TR181 client app is disabled]) ;;
+                   *) AC_MSG_ERROR([bad value ${enableval} for --enable-tr181set]) ;;
+                esac
+              ],
+              [echo "tr181 client app is disabled"])
+
+AM_CONDITIONAL([ENABLE_TR181SET_APP], [test x$ENABLE_TR181SET_APP = xtrue])
 
 AC_CONFIG_FILES([
         Makefile

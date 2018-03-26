@@ -116,7 +116,8 @@ ARGS=$@
 
 # component-specific vars
 export FSROOT=$RDK_FSROOT_PATH
-
+export LIB_RDK_INSTALLATION_DIR=${COMBINED_ROOT}/sdk/fsroot/ramdisk/lib/rdk
+export SM_CONFIG_PATH=${COMBINED_ROOT}/sdk/fsroot/ramdisk/etc
 
 # functional modules
 
@@ -202,6 +203,14 @@ function install()
     if [ "x${RDK_PLATFORM_DEVICE^^}" != "xRNG150" ]; then
         cp utils/tr181Set $FSROOT/usr/bin
     fi
+
+    mkdir -p ${LIB_RDK_INSTALLATION_DIR}
+    mkdir -p ${SM_CONFIG_PATH}
+    cp RFCbase.sh $LIB_RDK_INSTALLATION_DIR
+    cp RFCpostprocess.sh $LIB_RDK_INSTALLATION_DIR
+    cp getRFC.sh $LIB_RDK_INSTALLATION_DIR
+    cp isFeatureEnabled.sh $LIB_RDK_INSTALLATION_DIR
+    cp rfc.properties $SM_CONFIG_PATH
 }
 
 

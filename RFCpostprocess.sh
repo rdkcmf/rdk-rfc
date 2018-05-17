@@ -71,4 +71,8 @@ else
         sh $RDK_PATH/iptables_init SSH_Refresh &
         sh $RDK_PATH/iptables_init SNMP_Refresh &
     fi
+
+    if [ -f $RDK_PATH/setPNC.sh ]; then
+        sh $RDK_PATH/setPNC.sh &
+    fi
 fi

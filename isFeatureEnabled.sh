@@ -32,13 +32,14 @@
 . /etc/include.properties
 
 if [ -z $LOG_PATH ]; then
-	LOG_PATH="/opt/logs"
+    LOG_PATH="/opt/logs"
 fi
 
 if [ -z $RDK_PATH ]; then
     RDK_PATH="/lib/rdk"
 fi
 
+doesRFCFeatureExist=-1
 #####################################################################
 
 #####################################################################
@@ -51,35 +52,41 @@ ifeLogging ()
 #####################################################################
 isFeatureEnabled()
 {
-	retF=0
-	result_getRFC=77
-	if [ -f /lib/rdk/getRFC.sh ]; then
-		. $RDK_PATH/getRFC.sh  $1
+    retF=0
+    result_getRFC=77
+    if [ -f /lib/rdk/getRFC.sh ]; then
+        . $RDK_PATH/getRFC.sh  $1
 
-		variable1=RFC_ENABLE_$1
-		if [ "$result_getRFC" = "1" ]; then
-		
-			varValue=${!variable1}
-			ifeLogging "Requesting $variable1 = $varValue"
-			if [  $varValue = "true" ]; then
-				retF=1
-			fi
-		else
-			ifeLogging "Requesting $1 ($variable1) NOT IN RFC!"
-		fi
-	else
-		ifeLogging "ERROR: missing $RDK_PATH/getRFC.sh"
-	fi
-	return $retF
+        variable1=RFC_ENABLE_$1
+        if [ "$result_getRFC" = "1" ]; then
+            varValue=${!variable1}
+            ifeLogging "Requesting $variable1 = $varValue"
+            if [  $varValue = "true" ]; then
+                retF=1
+            elif [  $varValue = "false" ]; then
+                retF=0
+            fi
+            doesRFCFeatureExist=1
+        else
+            ifeLogging "Requesting $1 ($variable1) NOT IN RFC!"
+        fi
+    else
+        ifeLogging "ERROR: missing $RDK_PATH/getRFC.sh"
+    fi
+    return $retF
 }
 	
 if [ $# -eq 1 ]; then
-	isFeatureEnabled $1
-	returniF=$?
+    isFeatureEnabled $1
+    returniF=$?
 else
-	returniF=-1
-	ifeLogging "WRONG Parameters: $#"
-	ifeLogging " Usage: isFeatureEnabled.sh FEATURE_NAME"
+    returniF=-1
+    ifeLogging "WRONG Parameters: $#"
+    ifeLogging " Usage: isFeatureEnabled.sh FEATURE_NAME"
+fi
+
+if [ $doesRFCFeatureExist -eq 1 ]; then
+   doesRFCFeatureExist=$returniF
 fi
 ifeLogging "isFeatureEnabled $1 Returns $returniF"
 echo $returniF

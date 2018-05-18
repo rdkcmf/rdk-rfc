@@ -680,7 +680,7 @@ processJsonResponseB()
             $RFC_SET Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.ContainerSupport bool false
             while read line; do
                 key=`echo $line|cut -d ":" -f1`
-                value=`echo $line|cut -d ":" -f2`
+                value=`echo $line|cut -d ":" -f2-`
                 rfcLogging "key=$key value=$value"
                 parseConfigValue $key $value
             done < $file

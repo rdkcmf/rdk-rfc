@@ -36,11 +36,10 @@
 ##  "$DEVICE_TYPE" = "mediaclient"
 ##  DEVICE_TYPE=hybrid
 ##   "$DEVICE_TYPE" == "XHC1"
-##   "$DEVICE_TYPE" = "rmfstreamer" 
-##  "$DEVICE_TYPE" = "broadband" 
+##   "$DEVICE_TYPE" = "rmfstreamer"
+##  "$DEVICE_TYPE" = "broadband"
 ##
 
-#MN2
 if [ "$DEVICE_TYPE" = "broadband" ]; then
     source /etc/log_timestamp.sh  #?
     source /lib/rdk/getpartnerid.sh
@@ -81,20 +80,41 @@ if [ "$DEVICE_TYPE" = "broadband" ]; then
 else
     RFC_LOG_FILE="$LOG_PATH/rfcscript.log"
 fi
-    
+
 if [ -z $RDK_PATH ]; then
     RDK_PATH="/lib/rdk"
 fi
+#####################################################################
+##  RFC Logging helper function
+#####################################################################
+rfcLogging ()
+{
+    if [ "$DEVICE_TYPE" = "broadband" ]; then
+        echo_t "[RFC]:: $1" >> $RFC_LOG_FILE
+    else
+        echo "`/bin/timestamp` [RFC]:: $1" >> $RFC_LOG_FILE
+    fi
+}
+#####################################################################
 
-
-if [ -z $RFC_PATH ]; then
-    RFC_PATH="$PERSISTENT_PATH/RFC"
+## check if RFC transition has to take place from old to new secure location
+if [ "$DEVICE_TYPE" != "broadband" ]; then
+    if [ ! -d $RFC_BASE/RFC ]; then
+        if [ -d $OLD_RFC_BASE/RFC ]; then
+            rfcLogging "Changing RFC location CurrentLoc=$OLD_RFC_BASE/RFC, NewLoc=$RFC_BASE/RFC"
+            ls -l $OLD_RFC_BASE/RFC >> $RFC_LOG_FILE
+            mv  $OLD_RFC_BASE/RFC $RFC_BASE
+        else
+            if [ ! -d $RFC_BASE ]; then
+                rfcLogging "ERROR configuring RFC location NewLoc=$RFC_BASE, no parent folder"
+            else
+                rfcLogging "Configuring missing RFC location NewLoc=$RFC_PATH"
+                mkdir -p $RFC_PATH
+            fi
+        fi
+    fi
 fi
-
-if [ ! -d $RFC_PATH ]; then
-    mkdir -p $RFC_PATH
-fi
-
+########################################
 # create RAM based folder
 if [ -z $RFC_RAM_PATH ]; then
     RFC_RAM_PATH="/tmp/RFC"
@@ -269,7 +289,7 @@ processJsonResponseV()
         # cat /dev/null > $VARFILE #empty old file
         rm -f $RFC_TMP_PATH/.RFC_*
         rm -f $VARFILE
-        rm -f $PERSISTENT_PATH/RFC/tr181.list
+        rm -f $RFC_PATH/tr181.list
 
         c1=0    #flag to control feature enable definition
         c2=0    #flag to control start parameters
@@ -374,7 +394,7 @@ processJsonResponseV()
                             else
                                 # echo "Processing line $line"
                                 value7=`echo "$line" | awk '{print $7}'`
-                                echo "TR-181: $value3 $value7"  >> $PERSISTENT_PATH/RFC/tr181.list
+                                echo "TR-181: $value3 $value7"  >> $RFC_PATH/tr181.list
                                 value8="$RFC_SET -v $value7  $value3 "
                                 rfcLogging "$value8"
                                 $RFC_SET -v $value7  $value3 >> $RFC_LOG_FILE
@@ -482,9 +502,11 @@ sendHttpRequestToServer()
     if [ $retSs = 0 ] && [ "$http_code" = "404" ]; then
          rfcLogging "Received HTTP 404 Response from Xconf Server. Retry logic not needed"
     # Remove previous configuration
-         rm -f $RFC_PATH/.RFC_*
-         rm -rf $RFC_TMP_PATH
-         rm -f $VARIABLEFILE
+        if [ "$DEVICE_TYPE" != "broadband" ]; then 
+            rm -f $RFC_PATH/.RFC_*
+            rm -rf $RFC_TMP_PATH
+            rm -f $VARIABLEFILE
+        fi
 
     # Now delete write lock, if set
         rm -f $RFC_WRITE_LOCK
@@ -521,17 +543,6 @@ sendHttpRequestToServer()
     rfcLogging "resp = $resp"
 
     return $resp
-}
-#####################################################################
-
-#####################################################################
-rfcLogging ()
-{
-    if [ "$DEVICE_TYPE" = "broadband" ]; then
-        echo_t "[RFC]:: $1" >> $RFC_LOG_FILE
-    else
-        echo "`/bin/timestamp` [RFC]:: $1" >> $RFC_LOG_FILE
-    fi
 }
 #####################################################################
 

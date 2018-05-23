@@ -23,6 +23,7 @@
 ## Author:
 ##################################################################
 . /etc/include.properties
+. /etc/device.properties
 
 if [ -z $LOG_PATH ]; then
     if [ "$DEVICE_TYPE" = "broadband" ]; then

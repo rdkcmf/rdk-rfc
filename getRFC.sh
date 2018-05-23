@@ -29,6 +29,8 @@
 ## Author: Milorad
 ##################################################################
 
+. /etc/include.properties
+
 if [ "$BUILD_TYPE" != "prod" ] && [ -f /opt/rfc.properties ]; then
       . /opt/rfc.properties
 else

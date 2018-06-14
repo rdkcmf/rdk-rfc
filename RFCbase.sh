@@ -269,10 +269,6 @@ processJsonResponseV()
         sed -i 's/"name"/\n"name"/g' $FILENAME #
         sed -i 's/{/{\n/g' $FILENAME #
         sed -i 's/}/\n}/g' $FILENAME #
-        sed -i 's/"configset-id"/\n"configset_id"/g' $FILENAME #
-        sed -i 's/"configset-label"/\n"configset_label"/g' $FILENAME #
-        sed -i 's/"configset_id"/\n"configset_id"/g' $FILENAME #        If DCM renamed these labels, use new definition
-        sed -i 's/"configset_label"/\n"configset_label"/g' $FILENAME #
         sed -i 's/"features/\n"features/g' $FILENAME #
         sed -i 's/"/ " /g' $FILENAME #
         sed -i 's/,/ ,\n/g' $FILENAME #
@@ -307,20 +303,6 @@ processJsonResponseV()
         # Parse the settings  by feature name
         # 1) Replace the '":' with '='
         # 2) Updating the result in a output file
-        # Process config set line
-            enable_Check=`echo "$line" | grep -ci 'configset_'`
-            if [ $enable_Check -ne 0 ]; then
-                value2=`echo "$line" | awk '{print $2}'`
-                value6=`echo "$line" | grep configset_ |awk '{print $6}'`
-                if [ $value2 =  "configset_id" ]; then
-                    echo "export RFC_$value2=$value6" >> $VARFILE
-                    rfcLogging "export RFC_$value2 = $value6"
-                fi
-                if [ $value2 =  "configset_label" ]; then
-                    echo "export RFC_$value2=$value6" >> $VARFILE
-                    rfcLogging "export RFC_$value2 = $value6"
-                fi
-            fi
 
             feature_Check=`echo "$line" | grep -ci 'name'`
             #echo "--> feature_Check=$feature_Check"
@@ -380,7 +362,7 @@ processJsonResponseV()
                         # Process configData line
 
                         value2=`echo "$line" | awk '{print $2}'`
-                        value3=`echo "$line" | awk '{print $3}'`
+                        paramName=`echo "$line" | awk '{print $3}'`
                         value6=`echo "$line" | awk '{print $6}'`
 
 
@@ -393,11 +375,19 @@ processJsonResponseV()
                                 rfcLogging "export RFC_DATA_$varName"_"$value2 = $value6"
                             else
                                 # echo "Processing line $line"
-                                value7=`echo "$line" | awk '{print $7}'`
-                                echo "TR-181: $value3 $value7"  >> $RFC_PATH/tr181.list
-                                value8="$RFC_SET -v $value7  $value3 "
-                                rfcLogging "$value8"
-                                $RFC_SET -v $value7  $value3 >> $RFC_LOG_FILE
+                                configValue=`echo "$line" | awk '{print $7}'`
+                                echo "TR-181: $paramName $configValue"  >> $RFC_PATH/tr181.list
+
+                                paramValue=`$RFC_GET $paramName  2>&1 > /dev/null`
+                                if [ "$paramValue" != "$configValue" ]; then
+                                    #RFC SET
+                                    value8="$RFC_SET -v $configValue  $paramName "
+                                    rfcLogging "$value8"
+                                    $RFC_SET -v $configValue  $paramName >> $RFC_LOG_FILE
+                                    rfcLogging "RFC:  updated for $paramName from value old=$paramValue, to new=$configValue"
+                                else
+                                    rfcLogging "RFC: For param $paramName new and old values are same value $configValue"
+                                fi
                             fi
                         fi
                     fi
@@ -661,16 +651,25 @@ parseConfigValue()
         rfcLogging "Parameter name $paramName"
         rfcLogging "Parameter value  $configValue"
         #dmcli GET
-        paramType=`$RFC_GET $paramName | grep type| tr -s ' ' |cut -f3 -d" " | tr , " "`
+        $RFC_GET $paramName  > /tmp/.paramRFC
+
+        paramType=`cat /tmp/.paramRFC | grep type| tr -s ' ' |cut -f3 -d" " | tr , " "`
         if [ -n "$paramType" ]; then
             rfcLogging "paramType is $paramType"
-            #dmcli SET
-            paramSet=`$RFC_SET $paramName $paramType $configValue | grep succeed| tr -s ' ' `
-            if [ -n "$paramSet" ]; then
-                rfcLogging "dmcli SET success for $paramName with value $configValue"
-            else
-                rfcLogging "dmcli SET failed for $paramName with value $configValue"
-            fi
+            #dmcli get value
+            paramValue=`cat /tmp/.paramRFC | grep value: | cut -d':' -f3 | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'`
+			rfcLogging "RFC: old parameter value $paramValue "
+            if [ "$paramValue" != "$configValue" ]; then
+		        #dmcli SET
+		        paramSet=`$RFC_SET $paramName $paramType $configValue | grep succeed| tr -s ' ' `
+		        if [ -n "$paramSet" ]; then
+		            rfcLogging "RFC:  updated for $paramName from value old=$paramValue, to new=$configValue"
+		        else
+		            rfcLogging "RFC: dmcli SET failed for $paramName with value $configValue"
+		        fi
+		    else
+                rfcLogging "RFC: For param $paramName new and old values are same value $configValue"
+		    fi
         else
             rfcLogging "dmcli GET failed for $paramName "
         fi

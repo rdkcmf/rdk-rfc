@@ -405,6 +405,7 @@ processJsonResponseV()
         # Now move temporary variable files to operational copies
         mv -f $VARFILE $VARIABLEFILE
 
+        mkdir -p $RFC_PATH
         # Delete all feature files. It is safe to do now since sourcing is faster than processing all variables.
         rm -f $RFC_PATH/.RFC_*
         mv -f $RFC_TMP_PATH/.RFC_* $RFC_PATH/.
@@ -732,6 +733,10 @@ rfcLogging "Starting execution of RFCbase.sh"
 
 rfcLogging "URL: $URL"
 
+if [ -f $RDK_PATH/RFCpreprocess.sh ]; then
+    rfcLogging "Starting Pre Processing"
+    sh $RDK_PATH/RFCpreprocess.sh &
+fi
 
 if [ "$DEVICE_TYPE" != "broadband" ]; then
     rfcLogging "Waiting 2 minutes before attempting to query xconf"

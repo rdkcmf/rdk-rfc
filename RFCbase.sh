@@ -179,6 +179,7 @@ fi
 RETRY_DELAY=60
 ## RETRY COUNT
 RETRY_COUNT=3
+DIRECT_BLOCK_FILENAME="/tmp/.lastdirectfail_rfc"
 default_IP=$DEFAULT_IP
 
 # store the working copy to VARFILE
@@ -191,9 +192,27 @@ if [ "$DEVICE_TYPE" = "broadband" ]; then
 else
     IF_FLAG=""
 fi
+UseCodebig=0
+CodebigAvailable=0
 #---------------------------------
 # Function declarations
 #---------------------------------
+IsDirectBlocked()
+{
+    ret=0
+    if [ -f $DIRECT_BLOCK_FILENAME ]; then
+        modtime=$(($(date +%s) - $(date +%s -r $DIRECT_BLOCK_FILENAME)))
+        if [ "$modtime" -le "$DIRECT_BLOCK_TIME" ]; then
+            rfcLogging "RFC: Last direct failed blocking is still valid, preventing direct"
+            ret=1
+        else
+            rfcLogging "RFC: Last direct failed blocking has expired, removing $DIRECT_BLOCK_FILENAME, allowing direct"
+            rm -f $DIRECT_BLOCK_FILENAME
+        fi
+    fi
+
+    return $ret
+}
 
 ## Get ECM mac address
 getECMMacAddress()
@@ -425,6 +444,7 @@ sendHttpRequestToServer()
     resp=0
     FILENAME=$1
     URL=$2
+    TryWithCodeBig=$3
 
     echo "RFC: URL=$URL"
     #Create json string
@@ -443,11 +463,16 @@ sendHttpRequestToServer()
     fi
     # force https
     URL=`echo $URL | sed "s/http:/https:/g"`
-    if [ "$DEVICE_TYPE" = "broadband" ]; then
-        # CURL_CMD="curl --tlsv1.2 -w '%{http_code}\n' --interface $EROUTER_INTERFACE --connect-timeout $timeout -m $timeout -o  \"$DCMRFCRESPONSE\" '$DCM_RFC_SERVER_URL$JSONSTR'"
-        CURL_CMD="curl -w '%{http_code}\n' "$IF_FLAG" --connect-timeout $timeout -m $timeout "$TLSFLAG" -o  \"$FILENAME\" '$URL$JSONSTR'"
+    if [ $TryWithCodeBig -eq 1 ]; then
+        rfcLogging "Attempt to get RFC settings"
+
+        SIGN_CMD="configparamgen 8 \"$JSONSTR\""
+        eval $SIGN_CMD > /tmp/.signedRequest
+        CB_SIGNED_REQUEST=`cat /tmp/.signedRequest`
+        rm -f /tmp/.signedRequest
+        CURL_CMD="curl -w '%{http_code}\n' "$IF_FLAG" --connect-timeout $timeout -m $timeout "$TLSFLAG" -o  \"$FILENAME\" \"$CB_SIGNED_REQUEST\""
     else
-        CURL_CMD="curl -w '%{http_code}\n' --connect-timeout $timeout -m $timeout "$TLSFLAG" -o  \"$FILENAME\" '$URL$JSONSTR'"
+        CURL_CMD="curl -w '%{http_code}\n' "$IF_FLAG" --connect-timeout $timeout -m $timeout "$TLSFLAG" -o  \"$FILENAME\" '$URL$JSONSTR'"
     fi
     rfcLogging "CURL_CMD: $CURL_CMD"
 
@@ -466,31 +491,10 @@ sendHttpRequestToServer()
     # Get the http_code
     http_code=$(awk -F\" '{print $1}' $HTTP_CODE)
     retSs=$?
-    rfcLogging "retSs = $retSs http_code: $http_code"
+    rfcLogging "TLSRet = $TLSRet http_code: $http_code"
 
 
-    # Retry for STBs hosted in open internet
-    if [ ! -z "$ENABLE_CB" -a "$ENABLE_CB"!=" " -a $http_code -eq 000 ] && [ -f /usr/bin/configparamgen ]; then
-        rfcLogging "Retry attempt to get logupload setting for STB in wild"
-
-        SIGN_CMD="configparamgen 8 \"$JSONSTR\""
-        eval $SIGN_CMD > /tmp/.signedRequest
-        CB_SIGNED_REQUEST=`cat /tmp/.signedRequest`
-        rm -f /tmp/.signedRequest
-        CURL_CMD="curl -w '%{http_code}\n' "$IF_FLAG" --connect-timeout $timeout -m $timeout "$TLSFLAG" -o  \"$FILENAME\" \"$CB_SIGNED_REQUEST\""
-        rfcLogging "UPDATE CURL_CMD: $CURL_CMD"
-        result= eval $CURL_CMD > $HTTP_CODE
-        TLSRet=$?
-        case $TLSRet in
-            35|51|53|54|58|59|60|64|66|77|80|82|83|90|91)
-                rfcLogging "RFC: HTTPS $TLSFLAG failed to connect to $1 server with curl error code $TLSRet"
-                ;;
-        esac
-
-        http_code=$(awk -F\" '{print $1}' $HTTP_CODE)
-        retSs=$?
-    fi
-    if [ $retSs = 0 ] && [ "$http_code" = "404" ]; then
+    if [ $TLSRet = 0 ] && [ "$http_code" = "404" ]; then
          rfcLogging "Received HTTP 404 Response from Xconf Server. Retry logic not needed"
     # Remove previous configuration
         if [ "$DEVICE_TYPE" != "broadband" ]; then 
@@ -503,7 +507,7 @@ sendHttpRequestToServer()
         rm -f $RFC_WRITE_LOCK
         resp=0
         echo 0 > $RFCFLAG
-    elif [ $retSs -ne 0 -o $http_code -ne 200 ] ; then
+    elif [ $retSs -ne 0 -o "$http_code" != "200" ] ; then   # check for retSs is probably superfluous
         rfcLogging "HTTP request failed"
         resp=1
     else
@@ -579,6 +583,22 @@ waitForIpAcquisition()
 #####################################################################
 CallXconf()
 {
+
+    UseCodebig=0
+    CodebigAvailable=0
+    if [ -f /etc/os-release ] && [ -f /usr/bin/configparamgen ]; then
+        CodeBigFirst=`$RFC_GET Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.CodeBigFirst.Enable 2>&1 > /dev/null`
+        CodebigAvailable=1
+        if [ "$CodeBigFirst" = "true" ]; then
+            rfcLogging "RFC: CodebigFirst is enabled"
+            UseCodebig=1
+        else
+            rfcLogging "RFC: CodebigFirst is disabled"
+            IsDirectBlocked
+	    UseCodebig=$?
+        fi
+    fi
+
     loop=1
     while [ $loop -eq 1 ]
     do
@@ -598,7 +618,7 @@ CallXconf()
                 loop=0
                 rfcLogging "Box IP is $estbIp"
 
-                sendHttpRequestToServer $FILENAME $URL
+                sendHttpRequestToServer $FILENAME $URL $UseCodebig
                 retSx=$?
                 rfcLogging "sendHttpRequestToServer returned $retSx"
 
@@ -606,7 +626,24 @@ CallXconf()
                 if [ $retSx -ne 0 ]; then
                     rfcLogging "Processing Response Failed!!"
                     count=$((count + 1))
-                    if [ $count -ge $RETRY_COUNT ]; then
+                    if [ $count -eq $RETRY_COUNT ]; then
+                        if [ $CodebigAvailable -eq 1 ]; then
+                            if [ $UseCodebig -eq 1 ]; then
+                                IsDirectBlocked
+                                skipdirect=$?           # check to see if direct communication is allowed
+                                if [ $skipdirect -eq 0 ]; then  # if direct is allowed
+                                    UseCodebig=0                # fallback to direct
+                                else
+                                    count=$((count + 1))    # force exit below, no need to continue
+                                fi
+                            else
+                                UseCodebig=1                # we were direct, try Codebig fallback
+                            fi
+                        else
+                            count=$((count + 1))    # force exit below
+                        fi
+                    fi
+                    if [ $count -gt $RETRY_COUNT ]; then
                         rfcLogging "$RETRY_COUNT tries failed. Giving up..."
                         rm -rf $FILENAME $HTTP_CODE
                         rfcLogging "Exiting script."
@@ -619,6 +656,13 @@ CallXconf()
                     sleep $RETRY_DELAY
                 else
                     rm -rf $HTTP_CODE
+                    if [ $count -gt 0 ] && [ $UseCodebig -eq 1 ] && [ $CodeBigFirst != "true" ]; then
+                        # only attempt to block direct if previous direct attempts failed and Codebig passed, therefore ...
+                        # if we passed (that's the else statement) but it wasn't the first try
+                        # and this pass was by using Codebig
+                        rfcLogging "RFC: Blocking direct attempts"
+                        touch $DIRECT_BLOCK_FILENAME
+                    fi
                 fi
             done
             sleep 15

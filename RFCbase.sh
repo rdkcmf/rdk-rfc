@@ -823,6 +823,8 @@ rm -f $RFC_SERVICE_LOCK
 if [ -n "$cron" ]
 then
         cron_update=1
+        # Dump existing cron jobs to a file
+        crontab -l -c /var/spool/cron/ > $current_cron_file
 
         vc1=`echo "$cron" | awk '{print $1}'`
         vc2=`echo "$cron" | awk '{print $2}'`

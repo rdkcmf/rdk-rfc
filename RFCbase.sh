@@ -44,10 +44,12 @@
 if [ "$DEVICE_TYPE" = "broadband" ]; then
     source /etc/log_timestamp.sh  #?
     source /lib/rdk/getpartnerid.sh
+    source /lib/rdk/getaccountid.sh
 else
 # initialize partnerId
     . $RDK_PATH/getPartnerId.sh
-
+# initialize accountId
+    . $RDK_PATH/getAccountId.sh
 fi
 
 
@@ -290,6 +292,8 @@ processJsonResponseV()
         c1=0    #flag to control feature enable definition
         c2=0    #flag to control start parameters
 
+        # store permanent parameters
+        rfcStashStoreParams
 
         # clear RFC data store before storing new values
         # this is required as sometime key value pairs will simply
@@ -303,6 +307,8 @@ processJsonResponseV()
         touch $TR181_STORE_NEW_FILENAME
 	$RFC_SET -v "$(date +%s )" Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Control.ConfigSetTime >> $RFC_LOG_FILE
 
+        # Now retrieve parameters that must persist
+        rfcStashRetrieveParams
         while read line
         do
         # Parse the settings  by feature name
@@ -478,6 +484,37 @@ rfcClearHashAndTime ()
 }
 
 #####################################################################
+#  Store and retrieve parameters that should exist
+#  regardless if they are provided by Xconf
+#####################################################################
+rfcStashStoreParams ()
+{
+    stashAccountId="Unknown"
+
+    if [ "$DEVICE_TYPE" = "broadband" ]; then
+        #dmcli GET
+        $RFC_GET Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AccountInfo.AccountID  > /tmp/.paramRFC
+        stashAccountId=paramValue=`cat /tmp/.paramRFC | grep value: | cut -d':' -f3 | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'`
+    else
+        stashAccountId=`$RFC_GET Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AccountInfo.AccountID  2>&1 > /dev/null`
+    fi
+}
+
+rfcStashRetrieveParams ()
+{
+
+    if [ "$DEVICE_TYPE" = "broadband" ]; then
+        #dmcli SET
+
+        paramSet=`$RFC_SET Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AccountInfo.AccountID string $stashAccountId | grep succeed| tr -s ' ' `
+    else
+        $RFC_SET -v "$stashAccountId" Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AccountInfo.AccountID  >> $RFC_LOG_FILE
+    fi
+
+    rfcLogging "RFC: Restored AccountID=$stashAccountId"
+
+}
+
 #####################################################################
 #####################################
 ## Send Http request to the server ##
@@ -492,9 +529,9 @@ sendHttpRequestToServer()
     echo "RFC: URL=$URL"
     #Create json string
     if [ "$DEVICE_TYPE" = "broadband" ]; then
-        JSONSTR='estbMacAddress='$(getErouterMacAddress)'&firmwareVersion='$(getFWVersion)'&env='$(getBuildType)'&model='$(getModel)'&ecmMacAddress='$(getMacAddress)'&controllerId='$(getControllerId)'&channelMapId='$(getChannelMapId)'&vodId='$(getVODId)'&partnerId='$(getPartnerId)'&version=2'
+        JSONSTR='estbMacAddress='$(getErouterMacAddress)'&firmwareVersion='$(getFWVersion)'&env='$(getBuildType)'&model='$(getModel)'&ecmMacAddress='$(getMacAddress)'&controllerId='$(getControllerId)'&channelMapId='$(getChannelMapId)'&vodId='$(getVODId)'&partnerId='$(getPartnerId)'&accountId='$(getAccountId)'&version=2'
     else
-        JSONSTR='estbMacAddress='$(getEstbMacAddress)'&firmwareVersion='$(getFWVersion)'&env='$(getBuildType)'&model='$(getModel)'&ecmMacAddress='$(getECMMacAddress)'&controllerId='$(getControllerId)'&channelMapId='$(getChannelMapId)'&vodId='$(getVODId)'&partnerId='$(getPartnerId)'&version=2'
+        JSONSTR='estbMacAddress='$(getEstbMacAddress)'&firmwareVersion='$(getFWVersion)'&env='$(getBuildType)'&model='$(getModel)'&ecmMacAddress='$(getECMMacAddress)'&controllerId='$(getControllerId)'&channelMapId='$(getChannelMapId)'&vodId='$(getVODId)'&partnerId='$(getPartnerId)'&accountId='$(getAccountId)'&version=2'
     fi
     #echo JSONSTR: $JSONSTR
 

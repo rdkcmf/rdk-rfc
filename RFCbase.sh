@@ -214,6 +214,19 @@ IsDirectBlocked()
     return $ret
 }
 
+getRequestType()
+{
+    if [ "$1" == "xconf.xcal.tv" ]; then
+        request_type=8
+    elif [ "$1" == "ci.xconfds.coast.xcal.tv" ]; then
+        request_type=16
+    else
+        request_type=0
+    fi
+    return $request_type
+}
+
+
 ## Get ECM mac address
 getECMMacAddress()
 {
@@ -465,8 +478,11 @@ sendHttpRequestToServer()
     URL=`echo $URL | sed "s/http:/https:/g"`
     if [ $TryWithCodeBig -eq 1 ]; then
         rfcLogging "Attempt to get RFC settings"
+        domain_name=`echo $URL | cut -d / -f 3`
+        getRequestType $domain_name
+        request_type=$?
 
-        SIGN_CMD="configparamgen 8 \"$JSONSTR\""
+        SIGN_CMD="configparamgen $request_type \"$JSONSTR\""
         eval $SIGN_CMD > /tmp/.signedRequest
         CB_SIGNED_REQUEST=`cat /tmp/.signedRequest`
         rm -f /tmp/.signedRequest

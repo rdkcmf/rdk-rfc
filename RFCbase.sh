@@ -142,7 +142,7 @@ DCM_PARSER_RESPONSE="/tmp/rfc_configdata.txt"
 URL="$RFC_CONFIG_SERVER_URL"
 echo "Initial URL: $URL"
 # File to save http code
-HTTP_CODE="/tmp/http_code"
+HTTP_CODE="/tmp/rfc_curl_httpcode"
 rm -rf $HTTP_CODE
 
 # Cron job file name

@@ -1,0 +1,76 @@
+##########################################################################
+# If not stated otherwise in this file or this component's Licenses.txt
+# file the following copyright and licenses apply:
+#
+# Copyright 2018 RDK Management
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+##########################################################################
+#                                               -*- Autoconf -*-
+# Process this file with autoconf to produce a configure script.
+AC_PREREQ([2.68])
+AC_INIT([rfctools], [1.0], [josekutty@tataelxsi.co.in])
+AC_CONFIG_SRCDIR([utils/jsonhandler.cpp])
+AC_CONFIG_SRCDIR([utils/trsetutils.cpp])
+AC_CONFIG_SRCDIR([utils/tr181utils.cpp])
+AC_CONFIG_HEADERS([utils/config.h])
+
+AM_INIT_AUTOMAKE([foreign])
+LT_INIT
+LT_LANG([C++])
+AC_PROG_CXX
+AC_PROG_CC
+
+# Checks for libraries.
+PKG_CHECK_MODULES([cjson],[cjson >= 0.0])
+
+# Checks for header files.
+AC_CHECK_HEADERS([stdlib.h string.h unistd.h])
+
+#check what all tools are enabled. rfctool by default
+ENABLE_RFCTOOL_APP=true
+#only for yocto builds.
+ENABLE_TR181SET_APP=" "
+
+AC_ARG_ENABLE([rfctool],
+              AS_HELP_STRING([--enable-rfctool],[enable rfctool app (default is yes)]),
+              [
+                case "${enableval}" in
+                 yes) ENABLE_RFCTOOL_APP=true;;
+                  no) ENABLE_RFCTOOL_APP=" ";
+                      AC_MSG_ERROR([RFC tool app is disabled]) ;;
+                   *) AC_MSG_ERROR([bad value ${enableval} for --enable-rfctool]) ;;
+                esac
+              ],
+              [echo "rfctool app is disabled"])
+AM_CONDITIONAL([ENABLE_RFCTOOL_APP], [test x$ENABLE_RFCTOOL_APP = xtrue])
+
+AC_ARG_ENABLE([tr181set],
+              AS_HELP_STRING([--enable-tr181set],[enable tr181 client app (default is no)]),
+              [
+                case "${enableval}" in
+                 yes) ENABLE_TR181SET_APP=true;;
+                  no) AC_MSG_ERROR([TR181 client app is disabled]) ;;
+                   *) AC_MSG_ERROR([bad value ${enableval} for --enable-tr181set]) ;;
+                esac
+              ],
+              [echo "tr181 client app is disabled"])
+
+AM_CONDITIONAL([ENABLE_TR181SET_APP], [test x$ENABLE_TR181SET_APP = xtrue])
+
+AC_CONFIG_FILES([
+        Makefile
+        rfcapi/Makefile
+	utils/Makefile])
+AC_OUTPUT
+

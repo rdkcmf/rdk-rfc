@@ -130,10 +130,8 @@ if [ "$DEVICE_TYPE" = "broadband" ]; then
     RFC_GET="dmcli eRT getv"
     RFC_SET="dmcli eRT setv"
 else
-    RFC_GET="tr181Set "
-    RFC_SET="tr181Set -s -t s"
-    RFC_SET_NEW="tr181 -s -t s"
-
+    RFC_GET="tr181 "
+    RFC_SET="tr181 -s -t s"
 fi
 
 # File to save curl response
@@ -300,12 +298,9 @@ processJsonResponseV()
         # disappear from the config data, as mac is mostly removed
         # to disable a feature rather than having different value
         echo "RFC: resetting all rfc values in backing store"  >> $RFC_LOG_FILE
-        $RFC_SET -v true Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Control.ClearDB >> $RFC_LOG_FILE
-        $RFC_SET_NEW -v true Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Control.ClearDB >> $RFC_LOG_FILE
-        $RFC_SET -v "$(date)" Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Control.DBRunTime >> $RFC_LOG_FILE
         touch $TR181_STORE_FILENAME
-        touch $TR181_STORE_NEW_FILENAME
-	$RFC_SET -v "$(date +%s )" Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Control.ConfigSetTime >> $RFC_LOG_FILE
+        $RFC_SET -v true Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Control.ClearDB >> $RFC_LOG_FILE
+        $RFC_SET -v "$(date +%s )" Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Control.ConfigChangeTime >> $RFC_LOG_FILE
 
         # Now retrieve parameters that must persist
         rfcStashRetrieveParams
@@ -372,12 +367,11 @@ processJsonResponseV()
                         if [ $enable_Check -ne 0 ]; then
                         # Process configData line
 
-                        value2=`echo "$line" | awk '{print $2}'`
-                        paramName=`echo "$line" | awk '{print $3}'`
-                        value6=`echo "$line" | awk '{print $6}'`
+                            value2=`echo "$line" | awk '{print $2}'`
+                            paramName=`echo "$line" | awk '{print $3}'`
+                            value6=`echo "$line" | awk '{print $6}'`
 
-
-                        # Extract tr181 data
+                            # Extract tr181 data
                             enable_Check=`echo "$value2" | grep -ci 'tr181.'`
                             if [ $enable_Check -eq 0 ]; then
                                 # echo "Processing line $line"
@@ -388,14 +382,26 @@ processJsonResponseV()
                                 # echo "Processing line $line"
                                 configValue=`echo "$line" | awk '{print $7}'`
                                 echo "TR-181: $paramName $configValue"  >> $RFC_PATH/tr181.list
-
                                 paramValue=`$RFC_GET $paramName  2>&1 > /dev/null`
-                                if [ "$paramValue" != "$configValue" ]; then
+                                enable_Check=`echo "$paramName" | grep -ci '.X_RDKCENTRAL-COM_RFC.'`
+                                if [ $enable_Check -eq 0 ]; then
+                                    # This is parameetr outside of RFC namespace and needs to be tested if it is same as already set value
+                                    if [ "$paramValue" != "$configValue" ]; then
+                                        # new value is different, parameetr must be updated
+                                        setConfigValue=1
+                                    else
+                                        setConfigValue=0
+                                    fi
+                                else
+                                    # Parameters in RFC space must be set again since database is cleared
+                                    setConfigValue=1
+                                fi
+
+                                if [ $setConfigValue -ne 0 ]; then
                                     #RFC SET
                                     value8="$RFC_SET -v $configValue  $paramName "
                                     rfcLogging "$value8"
                                     $RFC_SET -v $configValue  $paramName >> $RFC_LOG_FILE
-                                    $RFC_SET_NEW -v $configValue  $paramName >> $RFC_LOG_FILE
                                     rfcLogging "RFC:  updated for $paramName from value old=$paramValue, to new=$configValue"
                                 else
                                     rfcLogging "RFC: For param $paramName new and old values are same value $configValue"
@@ -406,10 +412,6 @@ processJsonResponseV()
                 fi
             fi
         done < $FILENAME
-        # Close tr-181 parameter update
-        echo "RFC: Flush out tr181store.ini file"  >> $RFC_LOG_FILE
-        $RFC_SET -v true Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Control.ClearDBEnd >> $RFC_LOG_FILE
-        $RFC_SET_NEW -v true Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Control.ClearDBEnd >> $RFC_LOG_FILE
 
         if [ $c1 -ne 0 ];then
             echo "ERROR Mismatch function name enable flag/n"
@@ -430,6 +432,13 @@ processJsonResponseV()
 
         # Now delete write lock
         rm -f $RFC_WRITE_LOCK
+
+        # Close tr-181 parameter update
+        echo "RFC: Flush out tr181store.ini file"  >> $RFC_LOG_FILE
+        $RFC_SET -v true Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Control.ClearDBEnd >> $RFC_LOG_FILE
+        # Reload video variables from modified initialization files.
+        $RFC_SET -v true "RFC_CONTROL_RELOADCACHE" >> $RFC_LOG_FILE
+
     else
         rfcLogging "$FILENAME not found."
         return 1
@@ -990,4 +999,5 @@ else
         rfcLogging "Second call Returned $retSs"
     fi
 fi
+
 

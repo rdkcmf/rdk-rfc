@@ -19,20 +19,16 @@
 
 bin_PROGRAMS =
 if ENABLE_TR181SET_APP
-bin_PROGRAMS += tr181 tr181Set
+bin_PROGRAMS += tr181
 endif
 
 if ENABLE_RFCTOOL_APP
 bin_PROGRAMS += rfctool
 endif
 
-tr181_SOURCES = tr181utils.cpp
-tr181_LDADD = ../rfcapi/.libs/librfcapi.la
-tr181_CPPFLAGS = -std=c++0x -Wall -I${top_srcdir}/rfcapi/ -I=/usr/include/wdmp-c
-
-tr181Set_SOURCES = trsetutils.cpp
-tr181Set_LDADD = -lIARMBus
-tr181Set_CPPFLAGS = -std=c++0x -Wall -I$(PKG_CONFIG_SYSROOT_DIR)${includedir}/rdk/iarmbus -I$(PKG_CONFIG_SYSROOT_DIR)${includedir}/rdk/tr69hostif
+tr181_SOURCES = tr181utils.cpp trsetutils.cpp
+tr181_LDADD = ../rfcapi/.libs/librfcapi.la -lIARMBus
+tr181_CPPFLAGS = -std=c++0x -Wall -I${top_srcdir}/rfcapi/ -I=/usr/include/wdmp-c -I$(PKG_CONFIG_SYSROOT_DIR)${includedir}/rdk/iarmbus
 
 rfctool_SOURCES = jsonhandler.cpp
 rfctool_LDADD = ${cjson_LIBS}

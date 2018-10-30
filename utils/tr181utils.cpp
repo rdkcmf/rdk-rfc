@@ -2,7 +2,7 @@
  * If not stated otherwise in this file or this component's Licenses.txt file the
  * following copyright and licenses apply:
  *
- * Copyright 2016 RDK Management
+ * Copyright 2018 RDK Management
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,13 +36,19 @@
 #include <string>
 #include <fstream>
 #include "rfcapi.h"
+#include "trsetutils.h"
 using namespace std;
 
-char value_type = 'u';
-char * value = NULL;
-char * key = NULL;
-REQ_TYPE mode = GET;
-bool silent = true;
+static char value_type = 'u';
+static char * value = NULL;
+static char * key = NULL;
+static REQ_TYPE mode = GET;
+static bool silent = true;
+
+inline bool legacyRfcEnabled() {
+    ifstream f("/opt/RFC/.RFC_LegacyRFCEnabled.ini");
+    return f.good();
+}
 
 /**
 * Returns the parameter type
@@ -95,61 +101,6 @@ static DATA_TYPE convertType(char type)
 }
 
 /**
-* @param [in] param the object holding the details
-*/
-static void printParameterDetails(RFC_ParamData_t param )
-{
-   cout << __FUNCTION__ << " >>Get Operation successfull " <<endl;
-   switch (param.type)
-   {
-      case WDMP_STRING :
-         {
-            cout << __FUNCTION__ << " >>Parameter Type ::String" << endl;
-            cout << __FUNCTION__ << " >>Param value ::" << param.value << endl;
-            cerr << param.value << endl;
-         }
-         break;
-      case WDMP_INT :
-         {
-            cout << __FUNCTION__ << " >>Parameter Type ::Integer" << endl;
-            int valueInt = atoi(param.value);
-            cout << __FUNCTION__ << " >>Param value ::" << valueInt << endl;
-            cerr << valueInt << endl;
-         }
-         break;
-      case WDMP_UINT :
-         {
-            cout << __FUNCTION__ << " >>Parameter Type ::Unsigned Integer" << endl;
-            unsigned int valueUint = atoi(param.value);
-            cout << __FUNCTION__ << " >>Param value ::" << valueUint << endl;
-            cerr << valueUint << endl;
-         }
-         break;
-      case WDMP_BOOLEAN:
-         {
-            cout << __FUNCTION__ << " >>Parameter Type ::Boolean" << endl;
-            bool valueBool = (0 == strncasecmp(param.value, "TRUE", 4)|| (isdigit(param.value[0]) && param.value[0] != '0' ));
-            cout << __FUNCTION__ << " >>Param value ::" << valueBool << endl;
-            cerr << valueBool << endl;
-         }
-         break;
-      case WDMP_DATETIME:
-         cout << __FUNCTION__ << " >>Parameter Type ::DateTime" << endl;
-         cout << __FUNCTION__ << " >>Param value ::" << param.value << endl;
-         cerr << param.value << endl;
-         break;
-      case WDMP_ULONG:
-         {
-            cout << __FUNCTION__ << " >>Parameter Type ::Unsigned Long" << endl;
-            unsigned long valueUlong = atol(param.value);
-            cout << __FUNCTION__ << " >>Param value ::" << valueUlong << endl;
-            cerr << valueUlong << endl;
-         }
-         break;
-   }
-}
-
-/**
 * Retrieves the details about a property
 * @param [in] paramName the parameter whose properties are retrieved
 * @return 0 if succesfully retrieve value, 1 otherwise
@@ -159,9 +110,10 @@ static int getAttribute(char * const paramName)
    RFC_ParamData_t param;
    WDMP_STATUS status = getRFCParameter(NULL, paramName, &param);
 
-   if(status == WDMP_SUCCESS)
+   if(status == WDMP_SUCCESS || status == WDMP_ERR_DEFAULT_VALUE)
    {
-       printParameterDetails(param);
+       cout << __FUNCTION__ << " >> Param Value :: " << param.value << endl;
+       cerr << param.value << endl;
    }
    else
    {
@@ -208,7 +160,7 @@ static void showusage(const char *exename)
       endl;
 }
 
-int parseargs(int argc, char * argv[])
+static int parseargs(int argc, char * argv[])
 {
     int i = 1;
     while ( i < argc )
@@ -254,6 +206,11 @@ int parseargs(int argc, char * argv[])
 
 int main(int argc, char *argv [])
 {
+   if(legacyRfcEnabled() == true)
+   {
+      return trsetutil(argc,argv);
+   }
+
    streambuf* stdout_handle;
    ofstream void_file;
    int retcode = 1;

@@ -423,7 +423,7 @@ int parseargs(int argc, char * argv[])
     return  0;
 }
 
-int main(int argc, char *argv [])
+int trsetutil(int argc, char *argv [])
 {
 	streambuf* stdout_handle;
 	ofstream void_file;

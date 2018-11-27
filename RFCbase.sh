@@ -63,6 +63,10 @@ if [ -z $PERSISTENT_PATH ]; then
     fi
 fi
 
+if [ -f $RDK_PATH/utils.sh ]; then
+   . $RDK_PATH/utils.sh
+fi
+
 if [ "$BUILD_TYPE" != "prod" ] && [ -f $PERSISTENT_PATH/rfc.properties ]; then
     . $PERSISTENT_PATH/rfc.properties
 else
@@ -117,10 +121,6 @@ export PATH=$PATH:/usr/bin:/bin:/usr/local/bin:/sbin:/usr/local/lighttpd/sbin:/u
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/Qt/lib:/usr/local/lib
 RFCFLAG="/tmp/.RFCSettingsFlag"
 
-
-if [ -f $RDK_PATH/utils.sh ]; then
-   . $RDK_PATH/utils.sh
-fi
 
 
 #---------------------------------
@@ -824,7 +824,11 @@ CallXconf()
     # XB3 platforms doesn't have os-release flag
     if [ -f /etc/os-release ] || [ "$DEVICE_TYPE" = "broadband" ]; then
         if [ -f /usr/bin/configparamgen ]; then
-            CodeBigFirst=`$RFC_GET Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.CodeBigFirst.Enable | grep value | cut -f3 -d : | cut -f2 -d " "`
+            if [ "$DEVICE_TYPE" = "broadband" ]; then
+                CodeBigFirst=`$RFC_GET Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.CodeBigFirst.Enable | grep value | cut -f3 -d : | cut -f2 -d " "`
+            else
+                CodeBigFirst=`$RFC_GET -g Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.CodeBigFirst.Enable 2>&1 > /dev/null`
+            fi
             CodebigAvailable=1
             if [ "$CodeBigFirst" = "true" ]; then
                 rfcLogging "RFC: CodebigFirst is enabled"

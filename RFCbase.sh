@@ -771,11 +771,6 @@ CallXconf()
                     sleep $RETRY_DELAY
                 else
                     rm -rf $HTTP_CODE
-                    if [ $count -gt 0 ] && [ $UseCodebig -eq 1 ] && [ $CodeBigFirst != "true" ]; then
-                        # only attempt to block direct if previous direct attempts failed and Codebig passed, therefore ...
-                        # if we passed (that's the else statement) but it wasn't the first try
-                        # and this pass was by using Codebig
-                    fi
                 fi
             done
             sleep 15

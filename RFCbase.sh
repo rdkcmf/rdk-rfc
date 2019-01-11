@@ -182,17 +182,6 @@ CodebigAvailable=0
 IsDirectBlocked()
 {
     ret=0
-    if [ -f $DIRECT_BLOCK_FILENAME ]; then
-        modtime=$(($(date +%s) - $(date +%s -r $DIRECT_BLOCK_FILENAME)))
-        if [ "$modtime" -le "$DIRECT_BLOCK_TIME" ]; then
-            rfcLogging "RFC: Last direct failed blocking is still valid, preventing direct"
-            ret=1
-        else
-            rfcLogging "RFC: Last direct failed blocking has expired, removing $DIRECT_BLOCK_FILENAME, allowing direct"
-            rm -f $DIRECT_BLOCK_FILENAME
-        fi
-    fi
-
     return $ret
 }
 
@@ -786,8 +775,6 @@ CallXconf()
                         # only attempt to block direct if previous direct attempts failed and Codebig passed, therefore ...
                         # if we passed (that's the else statement) but it wasn't the first try
                         # and this pass was by using Codebig
-                        rfcLogging "RFC: Blocking direct attempts"
-                        touch $DIRECT_BLOCK_FILENAME
                     fi
                 fi
             done

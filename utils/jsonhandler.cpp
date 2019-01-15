@@ -261,8 +261,8 @@ char * getFilePath(){
 
 	if(NULL == root_path)
 	{
-		printf("[%s: %d] Warning %s is not set, using /opt/RFC \n",__FUNCTION__,__LINE__,ROOT_DIR);
-		root_path ="/opt/RFC";
+		printf("[%s: %d] Warning %s is not set, using /opt/secure/RFC \n",__FUNCTION__,__LINE__,ROOT_DIR);
+		root_path ="/opt/secure/RFC";
 	}
 
 	if(NULL == filename_prefix)

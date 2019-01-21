@@ -116,6 +116,9 @@ WDMP_STATUS getRFCParameter(char *pcCallerID, const char* pcParameterName, RFC_P
 
                   return WDMP_SUCCESS;
                }
+               else {
+                  return WDMP_ERR_VALUE_IS_EMPTY;
+               }
             }
          }
          else
@@ -142,6 +145,9 @@ WDMP_STATUS getRFCParameter(char *pcCallerID, const char* pcParameterName, RFC_P
                   pstParam->value[strlen(retValue.c_str())] = '\0';
 
                   return WDMP_SUCCESS;
+               }
+               else {
+                  return WDMP_ERR_VALUE_IS_EMPTY;
                }
             }
 
@@ -410,6 +416,9 @@ const char * getRFCErrorString(WDMP_STATUS code)
    const char * err_string;
    switch(code)
    {
+      case WDMP_SUCCESS:
+         err_string = " Success";
+            break;
       case WDMP_FAILURE:
          err_string = " Request Failed";
             break;

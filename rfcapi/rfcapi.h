@@ -22,14 +22,12 @@
 
 #include <string.h>
 #include <stdlib.h>
+
 #ifdef __cplusplus
 extern "C"
 {
 #endif
 #include <wdmp-c.h>
-#ifdef __cplusplus
-}
-#endif
 
 #define MAX_PARAM_LEN     (2*1024)
 
@@ -42,5 +40,9 @@ typedef struct _RFC_Param_t {
 WDMP_STATUS getRFCParameter(char *pcCallerID, const char* pcParameterName, RFC_ParamData_t *pstParamData);
 WDMP_STATUS setRFCParameter(char *pcCallerID, const char* pcParameterName, const char* pcParameterValue, DATA_TYPE eDataType);
 const char* getRFCErrorString(WDMP_STATUS code);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

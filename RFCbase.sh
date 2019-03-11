@@ -236,6 +236,84 @@ getVODId()
 firmwareVersion=$(getFWVersion)
 
 ###########################################################################
+## Prerocess the response, so that it could be parsed for features       ##
+###########################################################################
+preProcessFile()
+{
+    # Prepare data for variable parsing
+        sed -i 's/"name"/\n"name"/g' $FILENAME #
+        sed -i 's/{/{\n/g' $FILENAME #
+        sed -i 's/}/\n}/g' $FILENAME #
+        sed -i 's/"features/\n"features/g' $FILENAME #
+        sed -i 's/"/ " /g' $FILENAME #
+        sed -i 's/,/ ,\n/g' $FILENAME #
+        sed -i 's/:/ : /' $FILENAME #
+        sed -i 's/tr181./tr181. /'  $FILENAME #
+
+        sed -i 's/^{//g' $FILENAME # Delete first character from file '{'
+        sed -i 's/}$//g' $FILENAME # Delete first character from file '}'
+        echo "" >> $FILENAME         # Adding a new line to the file
+
+        # clear the feature list
+        rm -f $RFC_TMP_PATH/rfcFeature.list
+}
+
+
+###########################################################################
+## Report the features       ##
+###########################################################################
+getFeatures()
+{
+    if [ -f "$FILENAME" ]; then
+        c1=0    #flag to control feature enable definition
+
+        while read line
+        do
+        #
+            feature_Check=`echo "$line" | grep -ci 'name'`
+
+            if [ $feature_Check -ne 0 ]; then
+                value2=`echo "$line" | awk '{print $2}'`
+                if [ $value2 =  "name" ]; then
+                    varName=`echo "$line" | grep name |awk '{print $6}'`
+                    c1=1
+                fi
+            fi
+
+            if [ $c1 -ne 0 ]; then
+            # Process enable config line
+                enable_Check=`echo "$line" | grep -ci 'enable'`
+                if [ $enable_Check -ne 0 ]; then
+                    value2=`echo "$line" | awk '{print $2}'`
+                    if [ $value2 =  "enable" ]; then
+                        value6=`echo "$line" | grep enable |awk '{print $5}'`
+
+                        echo -n " $varName=$value6," >> $RFC_TMP_PATH/rfcFeature.list
+                        c1=0
+                    fi
+                fi
+            fi
+        done < $FILENAME
+
+        cp $RFC_TMP_PATH/rfcFeature.list $RFC_PATH/rfcFeature.list
+
+        rfcLogging "[Features Enabled]-[STAGING]: `cat $RFC_PATH/rfcFeature.list`"
+    else
+        rfcLogging "$FILENAME not found."
+        return 1
+    fi
+}
+
+###########################################################################
+## Report the features       											 ##
+###########################################################################
+featureReport()
+{
+	preProcessFile
+	getFeatures
+}
+
+###########################################################################
 ## Process the response, update the list of variables in rfcVariable.ini ##
 ###########################################################################
 processJsonResponseV()
@@ -254,21 +332,8 @@ processJsonResponseV()
 
         rfcLogging "Utility $RFC_WHITELIST_TOOL is COMPLETED"
 
-    # Prepare data for variable parsing
-        sed -i 's/"name"/\n"name"/g' $FILENAME #
-        sed -i 's/{/{\n/g' $FILENAME #
-        sed -i 's/}/\n}/g' $FILENAME #
-        sed -i 's/"features/\n"features/g' $FILENAME #
-        sed -i 's/"/ " /g' $FILENAME #
-        sed -i 's/,/ ,\n/g' $FILENAME #
-        sed -i 's/:/ : /' $FILENAME #
-        sed -i 's/tr181./tr181. /'  $FILENAME #
-
-        sed -i 's/^{//g' $FILENAME # Delete first character from file '{'
-        sed -i 's/}$//g' $FILENAME # Delete first character from file '}'
-        echo "" >> $FILENAME         # Adding a new line to the file
-
-#        cp $FILENAME $OUTFILEOPT
+    # prepare json file for parsing
+        preProcessFile
 
     # Process RFC configuration
         # cat /dev/null > $VARFILE #empty old file
@@ -325,6 +390,7 @@ processJsonResponseV()
                         echo "export RFC_ENABLE_$varName=$value6" >> $VARFILE
                         echo "export RFC_ENABLE_$varName=$value6" >> $rfcVar.ini
                         rfcLogging "export RFC_ENABLE_$varName = $value6"
+                        echo -n " $varName=$value6," >> $RFC_TMP_PATH/rfcFeature.list
                     fi
                 fi
 
@@ -410,6 +476,8 @@ processJsonResponseV()
         # will be completed by the time we rename temp copy to reference variable file
         echo 1 > $RFC_WRITE_LOCK
 
+        cp $RFC_TMP_PATH/rfcFeature.list $RFC_PATH/rfcFeature.list
+        rfcLogging "[Features Enabled]-[STAGING]: `cat $RFC_PATH/rfcFeature.list`"
         # Now move temporary variable files to operational copies
         mv -f $VARFILE $VARIABLEFILE
 
@@ -417,7 +485,7 @@ processJsonResponseV()
         # Delete all feature files. It is safe to do now since sourcing is faster than processing all variables.
         rm -f $RFC_PATH/.RFC_*
         mv -f $RFC_TMP_PATH/.RFC_* $RFC_PATH/.
-	cp  $RFC_RAM_PATH/.*.list  $RFC_PATH
+        cp  $RFC_RAM_PATH/.*.list  $RFC_PATH
 
         # Now delete write lock
         rm -f $RFC_WRITE_LOCK
@@ -579,11 +647,12 @@ sendHttpRequestToServer()
 
 
     if [ $TLSRet = 0 ] && [ "$http_code" = "404" ]; then
-         rfcLogging "Received HTTP 404 Response from Xconf Server. Retry logic not needed"
+        rfcLogging "Received HTTP 404 Response from Xconf Server. Retry logic not needed"
     # Remove previous configuration
-         rm -f $RFC_PATH/.RFC_*
-         rm -rf $RFC_TMP_PATH
-         rm -f $VARIABLEFILE
+        rm -f $RFC_PATH/.RFC_*
+        rm -rf $RFC_TMP_PATH
+        rm -f $VARIABLEFILE
+        rfcLogging "[Features Enabled]-[NONE]: "
 
     # Now delete write lock, if set
         rm -f $RFC_WRITE_LOCK
@@ -598,6 +667,8 @@ sendHttpRequestToServer()
         fi
         resp=0
         echo 1 > $RFCFLAG
+        rfcLogging "[Features Enabled]-[ACTIVE]: `cat $RFC_PATH/rfcFeature.list`"
+
     elif [ $retSs -ne 0 -o "$http_code" != "200" ] ; then   # check for retSs is probably superfluous
         rfcLogging "HTTP request failed"
         resp=1
@@ -606,6 +677,7 @@ sendHttpRequestToServer()
         # Process the JSON response
         if [ "$DEVICE_TYPE" = "broadband" ]; then
             processJsonResponseB
+            featureReport
         else
             processJsonResponseV
         fi
@@ -981,5 +1053,6 @@ else
         rfcLogging "Second call Returned $retSs"
     fi
 fi
+
 
 

@@ -30,7 +30,8 @@ using namespace std;
 typedef enum _RFC_Cache_Type_t 
 {
   RFC_VAR,
-  RFC_TR181_STORE
+  RFC_TR181_STORE,
+  RFC_BS_STORE
 } RFC_Cache_Type_t;
 
 class RFCCache

@@ -354,6 +354,7 @@ processJsonResponseV()
         echo "RFC: resetting all rfc values in backing store"  >> $RFC_LOG_FILE
         touch $TR181_STORE_FILENAME
         $RFC_SET -v true Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Control.ClearDB >> $RFC_LOG_FILE
+        $RFC_SET -v true Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Bootstrap.Control.ClearDB >> $RFC_LOG_FILE
         $RFC_SET -v "$(date +%s )" Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Control.ConfigChangeTime >> $RFC_LOG_FILE
 
         # Now retrieve parameters that must persist
@@ -493,6 +494,7 @@ processJsonResponseV()
         # Close tr-181 parameter update
         echo "RFC: Flush out tr181store.ini file"  >> $RFC_LOG_FILE
         $RFC_SET -v true Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Control.ClearDBEnd >> $RFC_LOG_FILE
+        $RFC_SET -v true Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Bootstrap.Control.ClearDBEnd >> $RFC_LOG_FILE
         # Reload video variables from modified initialization files.
         $RFC_SET -v true "RFC_CONTROL_RELOADCACHE" >> $RFC_LOG_FILE
 

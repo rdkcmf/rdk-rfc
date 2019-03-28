@@ -27,6 +27,7 @@
 
 #define RFC_VAR_KEY "RFC_VAR_FILENAME"
 #define RFC_TR181_STORE_KEY "TR181_STORE_FILENAME"
+#define RFC_BS_STORE_KEY "BS_STORE_FILENAME"
 #define RFC_PROPERTIES_FILE "/etc/rfc.properties"
 
 string RFCCache::getValue(const string &key)
@@ -58,13 +59,21 @@ bool RFCCache::initRFCDataFileName(RFC_Cache_Type_t rfcCacheType)
    }
    else
    {
+        string filenameKey;
+        if (rfcCacheType == RFC_VAR)
+            filenameKey = RFC_VAR_KEY;
+        else if (rfcCacheType == RFC_TR181_STORE)
+            filenameKey = RFC_TR181_STORE_KEY;
+        else if (rfcCacheType == RFC_BS_STORE)
+            filenameKey = RFC_BS_STORE_KEY;
+
         string line;
         while (getline(ifs_rfc, line)) {
             size_t splitterPos = line.find('=');
             if (splitterPos < line.length()) {
                 string key = line.substr(0, splitterPos);
                 string value = line.substr(splitterPos+1, line.length());
-                if(!key.compare((rfcCacheType == RFC_VAR)?RFC_VAR_KEY:RFC_TR181_STORE_KEY))
+                if(!key.compare(filenameKey))
                 {
                   m_filename = value;
                   RDK_LOG(RDK_LOG_DEBUG, LOG_RFCAPI, "RFC Variables FileName = %s\n", m_filename.c_str());
@@ -75,7 +84,7 @@ bool RFCCache::initRFCDataFileName(RFC_Cache_Type_t rfcCacheType)
 
         if(m_filename.empty())
       {
-         RDK_LOG(RDK_LOG_ERROR, LOG_RFCAPI, "Didn't find %s in %s\n", RFC_VAR_KEY, RFC_PROPERTIES_FILE);
+         RDK_LOG(RDK_LOG_ERROR, LOG_RFCAPI, "Didn't find %s in %s\n", filenameKey, RFC_PROPERTIES_FILE);
          return false;
       }
    }

@@ -118,7 +118,7 @@ WDMP_STATUS getRFCParameter(char *pcCallerID, const char* pcParameterName, RFC_P
                }
             }
          }
-         else if (strstr(pcParameterName, TR181_RFC_PREFIX) != NULL)
+         else
          {
             RFCCache rfcStoreCache;
             bool initDone = rfcStoreCache.initCache(RFC_TR181_STORE);
@@ -144,13 +144,36 @@ WDMP_STATUS getRFCParameter(char *pcCallerID, const char* pcParameterName, RFC_P
                   return WDMP_SUCCESS;
                }
             }
-            return WDMP_FAILURE;
-         }
-         else
-         {
+
+            // If the param is not found in tr181store.ini, also search in bootstrap.ini. When the hostif is not ready we do not know whether the requested param is regular tr181 param or bootstrap param.
+            RFCCache bsStoreCache;
+            initDone = bsStoreCache.initCache(RFC_BS_STORE);
+#ifdef TEMP_LOGGING
+            logofs << prefix() << __FUNCTION__ << ": BSStoreCache initDone = " << initDone << endl;
+#endif
+            if (initDone)
+            {
+               string retValue = bsStoreCache.getValue(pcParameterName);
+#ifdef TEMP_LOGGING
+               logofs << prefix() << __FUNCTION__ << ": Value for " << pcParameterName << "retrieved from BSStoreCache = " << retValue << endl;
+#endif
+               if(retValue.length() > 0)
+               {
+                  strncpy(pstParam->name, pcParameterName, strlen(pcParameterName));
+                  pstParam->name[strlen(pcParameterName)] = '\0';
+
+                  pstParam->type = WDMP_NONE; //The caller must know what type they are expecting if they are requesting a param before the hostif is ready.
+
+                  strncpy(pstParam->value, retValue.c_str(), strlen(retValue.c_str()));
+                  pstParam->value[strlen(retValue.c_str())] = '\0';
+
+                  return WDMP_SUCCESS;
+               }
+            }
 #ifdef TEMP_LOGGING
             logofs << prefix() << __FUNCTION__ << ": Param " << pcParameterName << ": is not available before http server is ready " << endl;
 #endif
+            return WDMP_FAILURE;
          }
       }
       else

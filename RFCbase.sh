@@ -233,8 +233,6 @@ getVODId()
     echo "15660"
 }
 
-firmwareVersion=$(getFWVersion)
-
 ###########################################################################
 ## Prerocess the response, so that it could be parsed for features       ##
 ###########################################################################
@@ -260,7 +258,7 @@ preProcessFile()
 
 
 ###########################################################################
-## Report the features       ##
+## Report the features                                                   ##
 ###########################################################################
 getFeatures()
 {
@@ -305,12 +303,12 @@ getFeatures()
 }
 
 ###########################################################################
-## Report the features       											 ##
+## Report the features                                                   ##
 ###########################################################################
 featureReport()
 {
-	preProcessFile
-	getFeatures
+     preProcessFile
+     getFeatures
 }
 
 ###########################################################################
@@ -612,8 +610,21 @@ sendHttpRequestToServer()
     # force https
     URL=`echo $URL | sed "s/http:/https:/g"`
 
-    # retrieve hash value for previous data set
-    rfcGetHashAndTime
+    firmwareVersion=$(getFWVersion)
+
+    if [ -f $RFC_PATH/.version ]; then
+        lastFirmware=`cat $RFC_PATH/.version`
+        else
+        lastFirmware=""
+    fi
+
+    if [ $firmwareVersion =  $lastFirmware ]; then
+        # retrieve hash value for previous data set
+        rfcGetHashAndTime
+    else
+        valueHash="UPGRADE_HASH"
+        valueTime="0"
+    fi
 
     if [ $TryWithCodeBig -eq 1 ]; then
         rfcLogging "Attempt to get RFC settings"
@@ -698,6 +709,8 @@ sendHttpRequestToServer()
 
     if [ $resp = 0 ]; then
         rfcSetHashAndTime
+
+        echo $firmwareVersion > $RFC_PATH/.version
 
         # Execute postprocessing
         if [ -f "$RFC_POSTPROCESS" ]; then

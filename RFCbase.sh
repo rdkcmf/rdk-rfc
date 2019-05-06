@@ -129,6 +129,9 @@ fi
 if [ "$DEVICE_TYPE" = "broadband" ]; then
     RFC_GET="dmcli eRT getv"
     RFC_SET="dmcli eRT setv"
+elif [ "$DEVICE_TYPE" = "XHC1" ]; then
+    RFC_GET="dmcli -g"
+    RFC_SET="dmcli -s"
 else
     RFC_GET="tr181 "
     RFC_SET="tr181 -s -t s"
@@ -337,7 +340,7 @@ processJsonResponseV()
         # cat /dev/null > $VARFILE #empty old file
         rm -f $RFC_TMP_PATH/.RFC_*
         rm -f $VARFILE
-        rm -f $PERSISTENT_PATH/RFC/tr181.list
+        rm -f $RFC_PATH/tr181.list
 
         c1=0    #flag to control feature enable definition
         c2=0    #flag to control start parameters
@@ -345,6 +348,7 @@ processJsonResponseV()
         # store permanent parameters
         rfcStashStoreParams
 
+       if [ "$DEVICE_TYPE" != "XHC1" ]; then
         # clear RFC data store before storing new values
         # this is required as sometime key value pairs will simply
         # disappear from the config data, as mac is mostly removed
@@ -354,6 +358,7 @@ processJsonResponseV()
         $RFC_SET -v true Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Control.ClearDB >> $RFC_LOG_FILE
         $RFC_SET -v true Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Bootstrap.Control.ClearDB >> $RFC_LOG_FILE
         $RFC_SET -v "$(date +%s )" Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Control.ConfigChangeTime >> $RFC_LOG_FILE
+        fi
 
         # Now retrieve parameters that must persist
         rfcStashRetrieveParams
@@ -441,7 +446,13 @@ processJsonResponseV()
                                 # echo "Processing line $line"
                                 configValue=`echo "$line" | awk '{print $7}'`
                                 echo "TR-181: $paramName $configValue"  >> $RFC_PATH/tr181.list
+                                if [ "$DEVICE_TYPE" != "XHC1" ]; then
                                 paramValue=`$RFC_GET $paramName  2>&1 > /dev/null`
+                                elif [ "$DEVICE_TYPE" = "XHC1" ]; then
+                                    $RFC_GET $paramName  > /tmp/.paramRFC
+                                    paramValue=`cat /tmp/.paramRFC | grep "$paramName" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | cut -d' ' -f3`
+                                fi
+
                                 enable_Check=`echo "$paramName" | grep -ci '.X_RDKCENTRAL-COM_RFC.'`
                                 if [ $enable_Check -eq 0 ]; then
                                     # This is parameetr outside of RFC namespace and needs to be tested if it is same as already set value
@@ -457,11 +468,16 @@ processJsonResponseV()
                                 fi
 
                                 if [ $setConfigValue -ne 0 ]; then
+                                    if [ "$DEVICE_TYPE" != "XHC1" ]; then
                                     #RFC SET
                                     value8="$RFC_SET -v $configValue  $paramName "
                                     rfcLogging "$value8"
                                     $RFC_SET -v $configValue  $paramName >> $RFC_LOG_FILE
                                     rfcLogging "RFC:  updated for $paramName from value old=$paramValue, to new=$configValue"
+                                else
+                                        $RFC_SET $paramName=$configValue >> $RFC_LOG_FILE
+                                        rfcLogging "RFC:  updated for $paramName from value old=$paramValue, to new=$configValue"
+                                    fi
                                 else
                                     rfcLogging "RFC: For param $paramName new and old values are same value $configValue"
                                 fi
@@ -494,12 +510,14 @@ processJsonResponseV()
         # Now delete write lock
         rm -f $RFC_WRITE_LOCK
 
+        if [ "$DEVICE_TYPE" != "XHC1" ]; then
         # Close tr-181 parameter update
         echo "RFC: Flush out tr181store.ini file"  >> $RFC_LOG_FILE
         $RFC_SET -v true Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Control.ClearDBEnd >> $RFC_LOG_FILE
         $RFC_SET -v true Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Bootstrap.Control.ClearDBEnd >> $RFC_LOG_FILE
         # Reload video variables from modified initialization files.
         $RFC_SET -v true "RFC_CONTROL_RELOADCACHE" >> $RFC_LOG_FILE
+        fi
 
     else
         rfcLogging "$FILENAME not found."
@@ -511,7 +529,7 @@ processJsonResponseV()
 #####################################################################
 rfcGetHashAndTime ()
 {
-    if [ "$DEVICE_TYPE" = "broadband" ]; then
+    if [ "$DEVICE_TYPE" = "broadband" ] || [ "$DEVICE_TYPE" = "XHC1" ]; then
     # read from the file since there is no common database on bb
         valueHash=`cat $RFC_RAM_PATH/.hashValue`
         valueTime=`cat $RFC_RAM_PATH/.timeValue`
@@ -526,7 +544,7 @@ rfcSetHTValue ()
 {
     rfcLogging "RFC: configsethash=$1 at configsettime=$2"
 
-    if [ "$DEVICE_TYPE" = "broadband" ]; then
+    if [ "$DEVICE_TYPE" = "broadband" ] || [ "$DEVICE_TYPE" = "XHC1" ]; then
         echo "$1" > $RFC_RAM_PATH/.hashValue
         echo "$2" > $RFC_RAM_PATH/.timeValue
     else
@@ -566,6 +584,9 @@ rfcStashStoreParams ()
         #dmcli GET
         $RFC_GET Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AccountInfo.AccountID  > /tmp/.paramRFC
         stashAccountId=paramValue=`cat /tmp/.paramRFC | grep value: | cut -d':' -f3 | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'`
+    elif [ "$DEVICE_TYPE" = "XHC1" ]; then
+        $RFC_GET Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AccountInfo.AccountID  > /tmp/.paramRFC
+        stashAccountId=`cat /tmp/.paramRFC | grep "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AccountInfo.AccountID" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | cut -d' ' -f3`
     else
         stashAccountId=`$RFC_GET Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AccountInfo.AccountID  2>&1 > /dev/null`
     fi
@@ -578,6 +599,8 @@ rfcStashRetrieveParams ()
         #dmcli SET
 
         paramSet=`$RFC_SET Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AccountInfo.AccountID string $stashAccountId | grep succeed| tr -s ' ' `
+    elif [ "$DEVICE_TYPE" = "XHC1" ]; then
+        $RFC_SET Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AccountInfo.AccountID="$stashAccountId" >> $RFC_LOG_FILE
     else
         $RFC_SET -v "$stashAccountId" Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AccountInfo.AccountID  >> $RFC_LOG_FILE
     fi
@@ -839,27 +862,37 @@ CallXconf()
                 retSx=$?
                 rfcLogging "sendHttpRequestToServer returned $retSx"
 
-            #If sendHttpRequestToServer method fails
+                #If sendHttpRequestToServer method fails
                 if [ $retSx -ne 0 ]; then
                     rfcLogging "Processing Response Failed!!"
                     count=$((count + 1))
                     if [ $count -eq $RETRY_COUNT ]; then
-                        if [ $CodebigAvailable -eq 1 ]; then
-                            if [ $UseCodebig -eq 1 ]; then
-                                IsDirectBlocked
-                                skipdirect=$?           # check to see if direct communication is allowed
-                                if [ $skipdirect -eq 0 ]; then  # if direct is allowed
-                                    UseCodebig=0                # fallback to direct
+                        if [ "$DEVICE_TYPE" !=  "XHC1" ];then
+                            if [ $CodebigAvailable -eq 1 ]; then
+                                if [ $UseCodebig -eq 1 ]; then
+                                    IsDirectBlocked
+                                    skipdirect=$?           # check to see if direct communication is allowed
+                                    if [ $skipdirect -eq 0 ]; then  # if direct is allowed
+                                        UseCodebig=0                # fallback to direct
+                                    else
+                                        count=$((count + 1))    # force exit below, no need to continue
+                                    fi
                                 else
-                                    count=$((count + 1))    # force exit below, no need to continue
+                                    UseCodebig=1                # we were direct, try Codebig fallback
                                 fi
                             else
-                                UseCodebig=1                # we were direct, try Codebig fallback
+                                count=$((count + 1))    # force exit below
                             fi
-                        else
-                            count=$((count + 1))    # force exit below
+                        else #XHC1 - Codebig tries
+                            #reset counter and retry count for codebig tries
+                            if [ $UseCodebig -eq 0 ]; then
+                                UseCodebig=1
+                                count=0
+                                RETRY_COUNT=2
+                            fi
                         fi
                     fi
+
                     if [ $count -gt $RETRY_COUNT ]; then
                         rfcLogging "$RETRY_COUNT tries failed. Giving up..."
                         rm -rf $FILENAME $HTTP_CODE
@@ -1063,7 +1096,11 @@ then
         echo "Configuring cron job for RFCbase.sh" >> $RFC_LOG_FILE
         crontab -l -c /var/spool/cron/ > $current_cron_file
         sed -i '/[A-Za-z0-9]*RFCbase.sh[A-Za-z0-9]*/d' $current_cron_file
-        echo "$cron /bin/sh $RDK_PATH/RFCbase.sh >> $PERSISTENT_PATH/logs/rfcscript.log 2>&1" >> $current_cron_file
+        if [ "$DEVICE_TYPE" != "XHC1" ]; then
+            echo "$cron /bin/sh $RDK_PATH/RFCbase.sh >> $RFC_LOG_FILE 2>&1" >> $current_cron_file
+        else
+            echo "$cron /bin/sh $RDK_PATH/RFCbase.sh" >> $current_cron_file
+        fi
 
         if [ $cron_update -eq 1 ];then
                 crontab $current_cron_file -c /var/spool/cron/

@@ -1,0 +1,7 @@
+<environment>
+  <components>
+    <rfc>
+      <dependencies>sdk,cjson</dependencies>
+    </rfc>
+  </components>
+</environment>

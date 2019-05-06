@@ -60,10 +60,11 @@ if [ "$DEVICE_TYPE" = "broadband" ]; then
     fi
 else
 # PROCESSING VIDEO SPECIFIC CALLS
-
-    # Insert the Dynamic White List Servers
-    if [ -f $RDK_PATH/iptables_init ]; then
-        sh $RDK_PATH/iptables_init SSH_Refresh &
-        sh $RDK_PATH/iptables_init SNMP_Refresh &
+    if [ "$DEVICE_TYPE" != "XHC1" ]; then
+        # Insert the Dynamic White List Servers
+        if [ -f $RDK_PATH/iptables_init ]; then
+            sh $RDK_PATH/iptables_init SSH_Refresh &
+            sh $RDK_PATH/iptables_init SNMP_Refresh &
+        fi
     fi
 fi

@@ -429,8 +429,13 @@ processJsonResponseV()
                             enable_Check=`echo "$value2" | grep -ci 'tr181.'`
                             if [ $enable_Check -eq 0 ]; then
                                 # echo "Processing line $line"
-                                echo "export RFC_DATA_$varName"_"$value2=\"$value6\"" >> $VARFILE
-                                echo "export RFC_DATA_$varName"_"$value2=\"$value6\"" >> $rfcVar.ini
+                                if [ "$DEVICE_TYPE" != "XHC1" ]; then
+                                    echo "export RFC_DATA_$varName"_"$value2=\"$value6\"" >> $VARFILE
+                                    echo "export RFC_DATA_$varName"_"$value2=\"$value6\"" >> $rfcVar.ini
+                                elif [ "$DEVICE_TYPE" = "XHC1" ]; then
+                                    echo "export RFC_DATA_$varName"_"$value2=$value6" >> $VARFILE
+                                    echo "export RFC_DATA_$varName"_"$value2=$value6" >> $rfcVar.ini
+                                fi
                                 rfcLogging "export RFC_DATA_$varName"_"$value2 = $value6"
                             else
                                 # echo "Processing line $line"

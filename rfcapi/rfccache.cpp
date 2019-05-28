@@ -84,7 +84,7 @@ bool RFCCache::initRFCDataFileName(RFC_Cache_Type_t rfcCacheType)
 
         if(m_filename.empty())
       {
-         RDK_LOG(RDK_LOG_ERROR, LOG_RFCAPI, "Didn't find %s in %s\n", filenameKey, RFC_PROPERTIES_FILE);
+         RDK_LOG(RDK_LOG_ERROR, LOG_RFCAPI, "Didn't find %s in %s\n", filenameKey.c_str(), RFC_PROPERTIES_FILE);
          return false;
       }
    }

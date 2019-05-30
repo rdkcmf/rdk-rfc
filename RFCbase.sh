@@ -988,8 +988,13 @@ if [ -f $RDK_PATH/RFCpreprocess.sh ]; then
 fi
 
 if [ "$DEVICE_TYPE" != "broadband" ]; then
-    rfcLogging "Waiting 2 minutes before attempting to query xconf"
-    sleep  120
+    if [ "$DEVICE_TYPE" = "XHC1" ]; then
+	rfcLogging "Waiting 5 minutes before attempting to query xconf"
+	sleep  300
+    else
+	rfcLogging "Waiting 2 minutes before attempting to query xconf"
+	sleep  120
+    fi
 fi
 
 rfcLogging "CALLING XConf FOR RFC CONFIGURATION"

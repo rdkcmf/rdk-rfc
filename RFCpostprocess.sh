@@ -55,6 +55,8 @@ if [ "$DEVICE_TYPE" = "broadband" ]; then
              echo "RFC File for SSH is not present or empty" >> $LOG_PATH/dcmrfc.log
           fi
        fi
+       dmcli eRT setv Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.Snmpv3DHKickstart.RFCUpdateDone bool true
+       echo "[RFC]:: RFCUpdateDone set to true" >> $LOG_PATH/rfcscript.log
     else
        echo "/tmp/.rfcLock file present" >> $LOG_PATH/dcmrfc.log
     fi
@@ -68,3 +70,5 @@ else
         fi
     fi
 fi
+
+echo "[RFC]:: POSTPROCESSING IS COMPLETE !!!" >> $LOG_PATH/rfcscript.log

@@ -746,6 +746,8 @@ sendHttpRequestToServer()
     FILENAME=$1
     URL=$2
     TryWithCodeBig=$3
+    EnableOCSPStapling="/tmp/.EnableOCSPStapling"
+    EnableOCSP="/tmp/.EnableOCSPCA"
 
     #Create json string
     if [ "$DEVICE_TYPE" = "broadband" ]; then 
@@ -790,11 +792,19 @@ sendHttpRequestToServer()
         eval $SIGN_CMD > /tmp/.signedRequest
         CB_SIGNED_REQUEST=`cat /tmp/.signedRequest`
         rm -f /tmp/.signedRequest
-        CURL_CMD="curl -w '%{http_code}\n'  -D "/tmp/curl_header"  "$IF_FLAG" --connect-timeout $timeout -m $timeout "$TLSFLAG" -H "configsethash:$valueHash" -H "configsettime:$valueTime" -o  \"$FILENAME\" \"$CB_SIGNED_REQUEST\""
+        if [ -f $EnableOCSPStapling ] || [ -f $EnableOCSP ]; then
+            CURL_CMD="curl -w '%{http_code}\n'  -D "/tmp/curl_header"  "$IF_FLAG" --cert-status --connect-timeout $timeout -m $timeout "$TLSFLAG" -H "configsethash:$valueHash" -H "configsettime:$valueTime" -o  \"$FILENAME\" \"$CB_SIGNED_REQUEST\""
+        else
+            CURL_CMD="curl -w '%{http_code}\n'  -D "/tmp/curl_header"  "$IF_FLAG" --connect-timeout $timeout -m $timeout "$TLSFLAG" -H "configsethash:$valueHash" -H "configsettime:$valueTime" -o  \"$FILENAME\" \"$CB_SIGNED_REQUEST\""
+        fi
         CURL_CMD_LOG=`echo "$CURL_CMD" | sed -ne 's#oauth_consumer_key=.*oauth_signature.*#-- <hidden> --#p'`
         rfcLogging "CURL_CMD: $CURL_CMD_LOG"
     else
-        CURL_CMD="curl -w '%{http_code}\n'  -D "/tmp/curl_header" "$IF_FLAG" --connect-timeout $timeout -m $timeout "$TLSFLAG"  -H "configsethash:$valueHash" -H "configsettime:$valueTime" -o  \"$FILENAME\" '$URL$JSONSTR'"
+        if [ -f $EnableOCSPStapling ] || [ -f $EnableOCSP ]; then
+            CURL_CMD="curl -w '%{http_code}\n'  -D "/tmp/curl_header" "$IF_FLAG" --cert-status --connect-timeout $timeout -m $timeout "$TLSFLAG"  -H "configsethash:$valueHash" -H "configsettime:$valueTime" -o  \"$FILENAME\" '$URL$JSONSTR'"
+        else
+            CURL_CMD="curl -w '%{http_code}\n'  -D "/tmp/curl_header" "$IF_FLAG" --connect-timeout $timeout -m $timeout "$TLSFLAG"  -H "configsethash:$valueHash" -H "configsettime:$valueTime" -o  \"$FILENAME\" '$URL$JSONSTR'"
+        fi
         rfcLogging "CURL_CMD: $CURL_CMD"
     fi
 

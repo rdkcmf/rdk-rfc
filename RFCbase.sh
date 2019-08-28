@@ -72,11 +72,9 @@ if [ -f $RDK_PATH/utils.sh ]; then
    . $RDK_PATH/utils.sh
 fi
 
-if [ "$BUILD_TYPE" != "prod" ] && [ -f $PERSISTENT_PATH/rfc.properties ]; then
-    . $PERSISTENT_PATH/rfc.properties
-else
-   . /etc/rfc.properties
-fi
+# Initially load firmware RFC configuration
+. /etc/rfc.properties
+
 
 if [ -z $LOG_PATH ]; then
     if [ "$DEVICE_TYPE" = "broadband" ]; then
@@ -143,12 +141,13 @@ else
 fi
 
 # File to save curl response
-FILENAME='/tmp/rfc-parsed.txt'          #  "$PERSISTENT_PATH/rfc-new.txt"
-#RFCRESPONSE="/tmp/rfcresponse.json"
+FILENAME='/tmp/rfc-parsed.txt'
+
 DCM_PARSER_RESPONSE="/tmp/rfc_configdata.txt"
 
 URL="$RFC_CONFIG_SERVER_URL"
 echo "Initial URL: $URL"
+
 # File to save http code
 HTTP_CODE="/tmp/rfc_curl_httpcode"
 rm -rf $HTTP_CODE
@@ -175,6 +174,21 @@ default_IP=$DEFAULT_IP
 # store the working copy to VARFILE
 VARFILE="$RFC_TMP_PATH/rfcVariable.ini"
 VARIABLEFILE="$RFC_PATH/rfcVariable.ini"
+
+#Xconf tr69 paramters
+XCONF_SELECTOR_TR181_NAME="Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Control.XconfSelector"
+XCONF_URL_TR181_NAME="Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Control.XconfUrl"
+
+#Xconf URL names for reference only, they are configured in Xconf
+# PROD_XCONF_URL="https://xconf.xcal.tv/featureControl/getSettings"
+# CI_XCONF_URL="https://ci.xconfds.coast.xcal.tv/featureControl/getSettings"
+# AUTO_XCONF_URL="https://rdkautotool.ccp.xcal.tv/featureControl/getSettings"
+
+# Initialize RFC configuration state
+rfcState="INIT"  # valid values are "INIT", "CONTINUE", "REDO"
+rfcSelectUrl="$RFC_CONFIG_SERVER_URL"
+rfcSelectOpt="prod"
+rfcSelectorSlot="$RFC_SLOT" # values are "8" for "prod", "16" for "ci", "19" for "automation" 
 
 TLSFLAG="--tlsv1.2"
 if [ "$DEVICE_TYPE" = "broadband" ]; then
@@ -260,8 +274,10 @@ preProcessFile()
         sed -i 's/}$//g' $FILENAME # Delete first character from file '}'
         echo "" >> $FILENAME         # Adding a new line to the file
 
+    if [ "$rfcState" != "INIT" ]; then
         # clear the feature list
         rm -f $RFC_TMP_PATH/rfcFeature.list
+    fi
 }
 
 
@@ -315,10 +331,112 @@ getFeatures()
 ###########################################################################
 featureReport()
 {
-     preProcessFile
-     getFeatures
+    preProcessFile
+    getFeatures
 }
 
+###########################################################################
+## Redirect to new Xconf if configured from production Xconf             ##
+###########################################################################
+getXconfSelect()
+{
+    if [ -f "$FILENAME" ]; then
+        c1=0    #flag to control feature enable definition
+
+        while read line
+        do
+        #
+ 
+            value2=`echo "$line" | awk '{print $2}'`
+            paramName=`echo "$line" | awk '{print $3}'`
+            value6=`echo "$line" | awk '{print $6}'`
+
+
+            # Extract tr181 data
+            enable_Check=`echo "$value2" | grep -ci 'tr181.'`
+            if [ $enable_Check -ne 0 ]; then
+                configValue=`echo "$line" | awk '{print $7}'`
+
+                enable_Check=`echo "$paramName" | grep -ci 'Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Control.XconfUrl'`
+                if [ $enable_Check -ne 0 ]; then
+                    rfcSelectUrl=$configValue
+                    URL="$rfcSelectUrl"
+                    rfcLogging "NEW Xconf URL configured: $configValue"
+                fi
+
+                enable_Check=`echo "$paramName" | grep -ci 'Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Control.XconfSelector'`
+                if [ $enable_Check -ne 0 ]; then
+                    rfcSelectOpt=$configValue
+                    rfcLogging "NEW Selector name configured $rfcSelectOpt"
+                    
+                    if [ "$rfcSelectOpt" == "ci" ]; then
+                        rfcSelectorSlot="16"
+                        rfcState="REDO"
+                    elif [ "$rfcSelectOpt" == "automation" ]; then
+                        rfcSelectorSlot="19"
+                        rfcState="REDO"
+                    else
+                        rfcSelectorSlot="8"
+                        rfcState="CONTINUE"
+                    fi
+                        
+                    rfcLogging "RFC Configured for Slot $rfcSelectorSlot, URL $rfcSelectUrl, State $rfcState "
+                fi
+               
+            fi
+            
+        done < $FILENAME
+
+    else
+        rfcLogging "$FILENAME not found."
+    fi
+
+    if [ "$rfcState" == "INIT" ]; then
+        # Override not configured through Production Xconf, check if there is local override
+        
+         rfcLogging "NO NEW XCONF in RFC, Using overide from  /opt/rfc.properties..."
+        if [ "$BUILD_TYPE" != "prod" ] && [ -f $PERSISTENT_PATH/rfc.properties ]; then
+            . $PERSISTENT_PATH/rfc.properties
+            rfcState="REDO"
+        else
+            # Just continue with production XCONF
+            rfcSelectorSlot="8"
+            rfcState="CONTINUE"
+        fi
+
+        rfcSelectorSlot="$RFC_SLOT"
+        URL="$RFC_CONFIG_SERVER_URL"
+        rfcSelectUrl="$URL"
+    fi
+}
+
+######################################################################################
+## Pre-process the Json response to check if new Xconf server needs to be contacted ##
+######################################################################################
+preProcessJsonResponse()
+{
+
+    if [ "$rfcState" == "INIT" ]; then
+        if [ -f "$FILENAME" ]; then
+            OUTFILE='/tmp/rfc-current.json'
+			cat /dev/null > $OUTFILE #empty old file
+			cp $FILENAME $OUTFILE
+            
+            preProcessFile
+            
+            #determine next Xconf target
+            getXconfSelect
+            
+            # Restore original response
+            cp $OUTFILE $FILENAME 
+		else
+            rfcLogging "ERROR: Processing $rfcState (P2) state BUT $FILENAME is missing"
+		fi
+    elif [ "$rfcState" == "REDO" ]; then
+        # This is second passing and NEW request to Xconf is already completed
+        rfcState="CONTINUE"
+	fi
+}
 ###########################################################################
 ## Process the response, update the list of variables in rfcVariable.ini ##
 ###########################################################################
@@ -326,47 +444,49 @@ processJsonResponseV()
 {
     if [ -f "$FILENAME" ]; then
         OUTFILE='/tmp/rfc-current.json'
+		
+		if [ "$rfcState" == "INIT" ]; then
+			cat /dev/null > $OUTFILE #empty old file
+			cp $FILENAME $OUTFILE
+		else
+		# Extract Whitelists
+			cat $OUTFILE
+			rfcLogging "Utility $RFC_WHITELIST_TOOL is processing $OUTFILE"
+			$RFC_WHITELIST_TOOL $OUTFILE
+			cp $RFC_PATH/$RFC_LIST_FILE_NAME_PREFIX*$RFC_LIST_FILE_NAME_SUFFIX $RFC_RAM_PATH/.
 
-        cat /dev/null > $OUTFILE #empty old file
-        cp $FILENAME $OUTFILE
+			rfcLogging "Utility $RFC_WHITELIST_TOOL is COMPLETED"
+			# cat /dev/null > $VARFILE #empty old file
+			rm -f $RFC_TMP_PATH/.RFC_*
+			rm -f $VARFILE
+			rm -f $RFC_PATH/tr181.list   # $PERSISTENT_PATH/RFC/tr181.list			
 
-    # Extract Whitelists
-        cat $OUTFILE
-        rfcLogging "Utility $RFC_WHITELIST_TOOL is processing $OUTFILE"
-        $RFC_WHITELIST_TOOL $OUTFILE
-        cp $RFC_PATH/$RFC_LIST_FILE_NAME_PREFIX*$RFC_LIST_FILE_NAME_SUFFIX $RFC_RAM_PATH/.
+			# store permanent parameters
+			rfcStashStoreParams
 
-        rfcLogging "Utility $RFC_WHITELIST_TOOL is COMPLETED"
+			# clear RFC data store before storing new values
+			# this is required as sometime key value pairs will simply
+			# disappear from the config data, as mac is mostly removed
+			# to disable a feature rather than having different value
+			echo "RFC: resetting all rfc values in backing store"  >> $RFC_LOG_FILE
+			touch $TR181_STORE_FILENAME
+			$RFC_SET -v true Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Control.ClearDB >> $RFC_LOG_FILE
+			$RFC_SET -v true Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Bootstrap.Control.ClearDB >> $RFC_LOG_FILE
+			$RFC_SET -v "$(date +%s )" Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Control.ConfigChangeTime >> $RFC_LOG_FILE
+
+			# Now retrieve parameters that must persist
+			rfcStashRetrieveParams
+		
+		fi
 
     # prepare json file for parsing
         preProcessFile
 
     # Process RFC configuration
-        # cat /dev/null > $VARFILE #empty old file
-        rm -f $RFC_TMP_PATH/.RFC_*
-        rm -f $VARFILE
-        rm -f $RFC_PATH/tr181.list
 
         c1=0    #flag to control feature enable definition
         c2=0    #flag to control start parameters
-
-        # store permanent parameters
-        rfcStashStoreParams
-
-       if [ "$DEVICE_TYPE" != "XHC1" ]; then
-        # clear RFC data store before storing new values
-        # this is required as sometime key value pairs will simply
-        # disappear from the config data, as mac is mostly removed
-        # to disable a feature rather than having different value
-        echo "RFC: resetting all rfc values in backing store"  >> $RFC_LOG_FILE
-        touch $TR181_STORE_FILENAME
-        $RFC_SET -v true Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Control.ClearDB >> $RFC_LOG_FILE
-        $RFC_SET -v true Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Bootstrap.Control.ClearDB >> $RFC_LOG_FILE
-        $RFC_SET -v "$(date +%s )" Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Control.ConfigChangeTime >> $RFC_LOG_FILE
-        fi
-
-        # Now retrieve parameters that must persist
-        rfcStashRetrieveParams
+		
         while read line
         do
         # Parse the settings  by feature name
@@ -523,7 +643,7 @@ processJsonResponseV()
         # Reload video variables from modified initialization files.
         $RFC_SET -v true "RFC_CONTROL_RELOADCACHE" >> $RFC_LOG_FILE
         fi
-
+        return 0
     else
         rfcLogging "$FILENAME not found."
         return 1
@@ -625,7 +745,6 @@ sendHttpRequestToServer()
     URL=$2
     TryWithCodeBig=$3
 
-    echo "RFC: URL=$URL"
     #Create json string
     if [ "$DEVICE_TYPE" = "broadband" ]; then 
         JSONSTR='estbMacAddress='$(getErouterMacAddress)'&firmwareVersion='$(getFWVersion)'&env='$(getBuildType)'&model='$(getModel)'&ecmMacAddress='$(getMacAddress)'&controllerId='$(getControllerId)'&channelMapId='$(getChannelMapId)'&vodId='$(getVODId)'&partnerId='$(getPartnerId)'&accountId='$(getAccountId)'&version=2'
@@ -644,6 +763,7 @@ sendHttpRequestToServer()
     fi
     # force https
     URL=`echo $URL | sed "s/http:/https:/g"`
+    echo "RFC: Sending request to URL=$URL"
 
     firmwareVersion=$(getFWVersion)
 
@@ -664,7 +784,7 @@ sendHttpRequestToServer()
     if [ $TryWithCodeBig -eq 1 ]; then
         rfcLogging "Attempt to get RFC settings"
 
-        SIGN_CMD="configparamgen 8 \"$JSONSTR\""
+        SIGN_CMD="configparamgen $rfcSelectorSlot \"$JSONSTR\""
         eval $SIGN_CMD > /tmp/.signedRequest
         CB_SIGNED_REQUEST=`cat /tmp/.signedRequest`
         rm -f /tmp/.signedRequest
@@ -722,7 +842,24 @@ sendHttpRequestToServer()
         resp=1
     else
         rfcLogging "HTTP request success. Processing response.."
-        # Process the JSON response
+        
+		# Pre-process Json Response to check if new Xconf server needs to be contacted
+		preProcessJsonResponse
+
+        stat=$?
+        rfcLogging "preProcessJsonResponse returned $stat"
+         if [ "$rfcState" == "REDO" ]; then
+            rfcLogging " RFC requires new Xconf request to server $rfcSelectUrl"
+            rfcLogging "RFC requires new Xconf request to server $rfcSelectUrl!!"
+            resp=1
+            
+            return $resp
+        else
+            rfcLogging "Continue processing RFC response rfcState=$rfcState"
+        fi
+
+		
+		# Process the JSON response
         if [ "$DEVICE_TYPE" = "broadband" ]; then
             processJsonResponseB
             featureReport
@@ -739,6 +876,17 @@ sendHttpRequestToServer()
             echo 1 > $RFCFLAG
         fi
         rfcLogging "COMPLETED RFC PASS"
+        
+        # Now store configuration so that it could be used by other processes 
+        
+        
+
+        XconfEndpoint="$rfcSelectOpt"
+        rfcLogging "STORRING XCONF URL AND SLOT NAME"
+        $RFC_SET -v "$rfcSelectOpt" ${XCONF_SELECTOR_TR181_NAME} >> $RFC_LOG_FILE
+        $RFC_SET -v "$rfcSelectUrl" ${XCONF_URL_TR181_NAME} >> $RFC_LOG_FILE    
+         
+        #
     fi
     rfcLogging "resp = $resp"
 
@@ -872,6 +1020,11 @@ CallXconf()
                 sendHttpRequestToServer $FILENAME $URL $UseCodebig
                 retSx=$?
                 rfcLogging "sendHttpRequestToServer returned $retSx"
+                if [ "$rfcState" == "REDO" ]; then
+                    # We have to abandon this data and start new request to redirect to new Xconf
+                    rm -f $RFC_WRITE_LOCK
+                    return 2
+                fi
 
                 #If sendHttpRequestToServer method fails
                 if [ $retSx -ne 0 ]; then
@@ -923,10 +1076,12 @@ CallXconf()
         fi
     done
 # Save cron info
+	if [ "$rfcState" !="INIT" ]; then
         if [ -f /tmp/DCMSettings.conf ]
         then
             cat /tmp/DCMSettings.conf | grep 'urn:settings:CheckSchedule:cron' > $PERSISTENT_PATH/tmpDCMSettings.conf
         fi
+	fi
 
 # Delete write lock if somehow we did not do it until now
     rm -f $RFC_WRITE_LOCK
@@ -1029,7 +1184,6 @@ waitForIpAcquisition
 
 rfcLogging "Starting execution of RFCbase.sh"
 
-rfcLogging "URL: $URL"
 
 if [ -f $RDK_PATH/RFCpreprocess.sh ]; then
     rfcLogging "Starting Pre Processing"
@@ -1038,19 +1192,33 @@ fi
 
 if [ "$DEVICE_TYPE" != "broadband" ]; then
     if [ "$DEVICE_TYPE" = "XHC1" ]; then
-	rfcLogging "Waiting 5 minutes before attempting to query xconf"
-	sleep  300
+        rfcLogging "Waiting 5 minutes before attempting to query xconf"
+        sleep  300
     else
-	rfcLogging "Waiting 2 minutes before attempting to query xconf"
-	sleep  120
+        rfcLogging "Waiting 2 minutes before attempting to query xconf"
+        sleep 120
     fi
 fi
 
-rfcLogging "CALLING XConf FOR RFC CONFIGURATION"
+rfcLogging "CALLING Initally PROD XConf FOR RFC CONFIGURATION"
+rfcLogging "    URL: $URL"
+
+rfcState="INIT"
 
 CallXconf
-retSs=$?
-rfcLogging "First call Returned $retSs"
+    retSs=$?
+    rfcLogging "First call Returned $retSs"
+
+
+#Check the Xconf url to be used based on Xconf selector.
+
+if [ "$rfcState" == "REDO" ]; then
+    rfcLogging "Calling request to NEW XConf..."
+    rfcLogging "    URL: $URL"
+
+    CallXconf
+fi
+
 
 # Finish the IP Firewall Configuration
 if [ -f $RDK_PATH/iptables_init ]; then
@@ -1131,11 +1299,10 @@ else
         rfcLogging "RFC: NO cron data found, retry in 5 hours RFC CONFIGURATION"
         sleep 18000
 
+        rfcState="CONTINUE"
         CallXconf
         retSs=$?
         rfcLogging "Second call Returned $retSs"
     fi
 fi
-
-
 

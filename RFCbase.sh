@@ -1097,6 +1097,7 @@ parseConfigValue()
 {
     configKey=$1
     configValue=$2
+    RebootValue=$3
     #Remove tr181
     paramName=`echo $configKey | grep tr181 | tr -s ' ' | cut -d "." -f2- `
 
@@ -1118,6 +1119,13 @@ parseConfigValue()
                         paramSet=`$RFC_SET $paramName $paramType "$configValue" | grep succeed| tr -s ' ' `
                         if [ -n "$paramSet" ]; then
                             rfcLogging "RFC:  updated for $paramName from value old=$paramValue, to new=$configValue"
+                                if [ $RebootValue -eq 1 ]; then
+                                        if [ -n "$RfcRebootCronNeeded" ]; then
+                                                RfcRebootCronNeeded=1;
+                                                 rfcLogging "RFC: Enabling RfcRebootCronNeeded since $paramName old value=$paramValue, new value=$configValue, RebootValue=$RebootValue"
+                                        fi
+
+                                fi
                         else
                             rfcLogging "RFC: dmcli SET failed for $paramName with value $configValue"
                         fi
@@ -1142,11 +1150,14 @@ processJsonResponseB()
             file=$DCM_PARSER_RESPONSE
             $RFC_SET Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.CodebigSupport bool false
             $RFC_SET Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.ContainerSupport bool false
+	    RfcRebootCronNeeded=0;
+            # here #~ is a delimiter to cut key, value and ImediateReboot values
             while read line; do
-                key=`echo $line|cut -d ":" -f1`
-                value=`echo $line|cut -d ":" -f2-`
-                rfcLogging "key=$key value=$value"
-                parseConfigValue $key "$value"
+                key=`echo $line| awk -F '#~' '{print $1}'`
+                value=`echo $line|awk -F '#~' '{print $2}'`
+		ImediateReboot=`echo $line|awk -F '#~' '{print $3}'`
+                rfcLogging "key=$key value=$value ImediateReboot=$ImediateReboot"
+                parseConfigValue $key "$value" $ImediateReboot
             done < $file
         else
             rfcLogging "$DCM_PARSER_RESPONSE is not present"
@@ -1306,3 +1317,8 @@ else
     fi
 fi
 
+     if [ $RfcRebootCronNeeded -eq 1 ] && [ "$DEVICE_TYPE" = "broadband" ]; then
+            #Effectictive Reboot is required for the New RFC config. calling the script which will schedule cron to reboot in maintence w
+            rfcLogging "RFC: RfcRebootCronNeeded=$RfcRebootCronNeeded. calling script to schedule reboot in maintence window "
+            sh /etc/RfcRebootCronschedule.sh &
+     fi

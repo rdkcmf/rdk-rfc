@@ -1115,7 +1115,7 @@ parseConfigValue()
                         rfcLogging "RFC: old parameter value $paramValue "
             if [ "$paramValue" != "$configValue" ]; then
                         #dmcli SET
-                        paramSet=`$RFC_SET $paramName $paramType $configValue | grep succeed| tr -s ' ' `
+                        paramSet=`$RFC_SET $paramName $paramType "$configValue" | grep succeed| tr -s ' ' `
                         if [ -n "$paramSet" ]; then
                             rfcLogging "RFC:  updated for $paramName from value old=$paramValue, to new=$configValue"
                         else
@@ -1146,7 +1146,7 @@ processJsonResponseB()
                 key=`echo $line|cut -d ":" -f1`
                 value=`echo $line|cut -d ":" -f2-`
                 rfcLogging "key=$key value=$value"
-                parseConfigValue $key $value
+                parseConfigValue $key "$value"
             done < $file
         else
             rfcLogging "$DCM_PARSER_RESPONSE is not present"

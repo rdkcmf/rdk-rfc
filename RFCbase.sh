@@ -50,6 +50,11 @@ else
     . $RDK_PATH/getPartnerId.sh
 # initialize accountId
     . $RDK_PATH/getAccountId.sh
+
+    # initialize accounHash
+    if [ "$DEVICE_TYPE" = "XHC1" ]; then
+        . $RDK_PATH/getAccountHash.sh
+    fi
 fi
 
 
@@ -622,8 +627,10 @@ sendHttpRequestToServer()
 
     echo "RFC: URL=$URL"
     #Create json string
-    if [ "$DEVICE_TYPE" = "broadband" ]; then
+    if [ "$DEVICE_TYPE" = "broadband" ]; then 
         JSONSTR='estbMacAddress='$(getErouterMacAddress)'&firmwareVersion='$(getFWVersion)'&env='$(getBuildType)'&model='$(getModel)'&ecmMacAddress='$(getMacAddress)'&controllerId='$(getControllerId)'&channelMapId='$(getChannelMapId)'&vodId='$(getVODId)'&partnerId='$(getPartnerId)'&accountId='$(getAccountId)'&version=2'
+    elif [ "$DEVICE_TYPE" = "XHC1" ]; then
+        JSONSTR='estbMacAddress='$(getEstbMacAddress)'&firmwareVersion='$(getFWVersion)'&env='$(getBuildType)'&model='$(getModel)'&accountHash='$(getAccountHash)'&partnerId='$(getPartnerId)'&accountId='$(getAccountId)'&version=2'
     else
         JSONSTR='estbMacAddress='$(getEstbMacAddress)'&firmwareVersion='$(getFWVersion)'&env='$(getBuildType)'&model='$(getModel)'&ecmMacAddress='$(getECMMacAddress)'&controllerId='$(getControllerId)'&channelMapId='$(getChannelMapId)'&vodId='$(getVODId)'&partnerId='$(getPartnerId)'&accountId='$(getAccountId)'&version=2'
     fi

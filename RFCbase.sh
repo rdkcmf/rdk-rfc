@@ -160,7 +160,7 @@ HTTP_CODE="/tmp/rfc_curl_httpcode"
 rm -rf $HTTP_CODE
 
 # Cron job file name
-current_cron_file="/tmp/cron_list"
+current_cron_file="/tmp/cron_list$$"
 
 if [ "$DEVICE_TYPE" = "broadband" ]; then
     # Timeout value

@@ -198,6 +198,8 @@ else
 fi
 UseCodebig=0
 CodebigAvailable=0
+RfcRebootCronNeeded=0
+
 #---------------------------------
 # Function declarations
 #---------------------------------
@@ -1076,7 +1078,7 @@ CallXconf()
         fi
     done
 # Save cron info
-	if [ "$rfcState" !="INIT" ]; then
+	if [ "$rfcState" != "INIT" ]; then
         if [ -f /tmp/DCMSettings.conf ]
         then
             cat /tmp/DCMSettings.conf | grep 'urn:settings:CheckSchedule:cron' > $PERSISTENT_PATH/tmpDCMSettings.conf
@@ -1317,7 +1319,7 @@ else
     fi
 fi
 
-     if [ $RfcRebootCronNeeded -eq 1 ] && [ "$DEVICE_TYPE" = "broadband" ]; then
+     if [ "$RfcRebootCronNeeded" = "1" ] && [ "$DEVICE_TYPE" = "broadband" ]; then
             #Effectictive Reboot is required for the New RFC config. calling the script which will schedule cron to reboot in maintence w
             rfcLogging "RFC: RfcRebootCronNeeded=$RfcRebootCronNeeded. calling script to schedule reboot in maintence window "
             sh /etc/RfcRebootCronschedule.sh &

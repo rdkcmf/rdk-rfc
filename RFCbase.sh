@@ -228,7 +228,7 @@ getFWVersion()
         grep imagename /version.txt | sed 's/.*[:=]//'
     else
         #cat /version.txt | grep ^imagename:PaceX1 | grep -v image
-        verStr=`cat /version.txt | grep ^imagename: | cut -d ":" -f 2`
+        verStr=`grep ^imagename: /version.txt | cut -d ":" -f 2`
         echo $verStr
     fi
 }
@@ -599,7 +599,7 @@ processJsonResponseV()
                                 paramValue=`$RFC_GET $paramName  2>&1 > /dev/null`
                                 elif [ "$DEVICE_TYPE" = "XHC1" ]; then
                                     $RFC_GET $paramName  > /tmp/.paramRFC
-                                    paramValue=`cat /tmp/.paramRFC | grep "$paramName" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | cut -d' ' -f3`
+                                    paramValue=`grep "$paramName" /tmp/.paramRFC | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | cut -d' ' -f3`
                                 fi
 
                                 enable_Check=`echo "$paramName" | grep -ci '.X_RDKCENTRAL-COM_RFC.'`
@@ -732,10 +732,10 @@ rfcStashStoreParams ()
     if [ "$DEVICE_TYPE" = "broadband" ]; then
         #dmcli GET
         $RFC_GET Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AccountInfo.AccountID  > /tmp/.paramRFC
-        stashAccountId=paramValue=`cat /tmp/.paramRFC | grep value: | cut -d':' -f3 | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'`
+        stashAccountId=paramValue=`grep "value:" /tmp/.paramRFC | cut -d':' -f3 | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'`
     elif [ "$DEVICE_TYPE" = "XHC1" ]; then
         $RFC_GET Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AccountInfo.AccountID  > /tmp/.paramRFC
-        stashAccountId=`cat /tmp/.paramRFC | grep "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AccountInfo.AccountID" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | cut -d' ' -f3`
+        stashAccountId=`grep "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AccountInfo.AccountID" /tmp/.paramRFC | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | cut -d' ' -f3`
     else
         stashAccountId=`$RFC_GET Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AccountInfo.AccountID  2>&1 > /dev/null`
     fi
@@ -1121,7 +1121,7 @@ CallXconf()
         if [ "$rfcState" != "INIT" ]; then
         if [ -f /tmp/DCMSettings.conf ]
         then
-            cat /tmp/DCMSettings.conf | grep 'urn:settings:CheckSchedule:cron' > $PERSISTENT_PATH/tmpDCMSettings.conf
+            grep 'urn:settings:CheckSchedule:cron' /tmp/DCMSettings.conf > $PERSISTENT_PATH/tmpDCMSettings.conf
         fi
         fi
 
@@ -1150,11 +1150,11 @@ parseConfigValue()
         #dmcli GET
         $RFC_GET $paramName  > /tmp/.paramRFC
 
-        paramType=`cat /tmp/.paramRFC | grep type| tr -s ' ' |cut -f3 -d" " | tr , " "`
+        paramType=`grep "type" /tmp/.paramRFC | tr -s ' ' |cut -f3 -d" " | tr , " "`
         if [ -n "$paramType" ]; then
             rfcLogging "paramType is $paramType"
             #dmcli get value
-            paramValue=`cat /tmp/.paramRFC | grep value: | cut -d':' -f3 | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'`
+            paramValue=`grep "value:" /tmp/.paramRFC | cut -d':' -f3 | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'`
                         rfcLogging "RFC: old parameter value $paramValue "
             if [ "$paramValue" != "$configValue" ]; then
                         #dmcli SET
@@ -1295,12 +1295,12 @@ rfcLogging "START CONFIGURING RFC CRON"
 cron=''
 if [ -f /tmp/DCMSettings.conf ]
 then
-        cat /tmp/DCMSettings.conf | grep 'urn:settings:CheckSchedule:cron' > $PERSISTENT_PATH/tmpDCMSettings.conf
-        cron=`cat /tmp/DCMSettings.conf | grep 'urn:settings:CheckSchedule:cron' | cut -d '=' -f2`
+        grep 'urn:settings:CheckSchedule:cron' /tmp/DCMSettings.conf > $PERSISTENT_PATH/tmpDCMSettings.conf
+        cron=`grep 'urn:settings:CheckSchedule:cron' /tmp/DCMSettings.conf | cut -d '=' -f2`
 else
         if [ -f $PERSISTENT_PATH/tmpDCMSettings.conf ]
         then
-              cron=`cat $PERSISTENT_PATH/tmpDCMSettings.conf | grep 'urn:settings:CheckSchedule:cron' | cut -d '=' -f2`
+              cron=`grep 'urn:settings:CheckSchedule:cron' $PERSISTENT_PATH/tmpDCMSettings.conf | cut -d '=' -f2`
         fi
 
 fi

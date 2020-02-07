@@ -39,7 +39,22 @@
 ##   "$DEVICE_TYPE" = "rmfstreamer"
 ##  "$DEVICE_TYPE" = "broadband"
 ##
+T2_MSG_CLIENT=/usr/bin/telemetry2_0_client
 
+t2CountNotify() {
+    if [ -f $T2_MSG_CLIENT ]; then
+        marker=$1
+        $T2_MSG_CLIENT  "$marker" "1"
+    fi
+}
+
+t2ValNotify() {
+    if [ -f $T2_MSG_CLIENT ]; then
+        marker=$1
+        shift
+        $T2_MSG_CLIENT "$marker" "$*"
+    fi
+}
 #MN2
 if [ "$DEVICE_TYPE" = "broadband" ]; then
     source /etc/log_timestamp.sh  #?
@@ -382,6 +397,7 @@ getFeatures()
         cp $RFC_TMP_PATH/rfcFeature.list $RFC_PATH/rfcFeature.list
 
         rfcLogging "[Features Enabled]-[STAGING]: `cat $RFC_PATH/rfcFeature.list`"
+        t2ValNotify "rfc_split" "`cat $RFC_PATH/rfcFeature.list`"
     else
         rfcLogging "$FILENAME not found."
         return 1
@@ -681,6 +697,7 @@ processJsonResponseV()
 
         cp $RFC_TMP_PATH/rfcFeature.list $RFC_PATH/rfcFeature.list
         rfcLogging "[Features Enabled]-[STAGING]: `cat $RFC_PATH/rfcFeature.list`"
+        t2ValNotify "rfc_split" "`cat $RFC_PATH/rfcFeature.list`"
         # Now move temporary variable files to operational copies
         mv -f $VARFILE $VARIABLEFILE
 
@@ -952,6 +969,7 @@ sendHttpRequestToServer()
         resp=0
         echo 1 > $RFCFLAG
         rfcLogging "[Features Enabled]-[ACTIVE]: `cat $RFC_PATH/rfcFeature.list`"
+        t2ValNotify "rfc_split" "`cat $RFC_PATH/rfcFeature.list`"
 
     elif [ $retSs -ne 0 -o "$http_code" != "200" ] ; then   # check for retSs is probably superfluous
         rfcLogging "HTTP request failed"
@@ -1390,7 +1408,15 @@ processJsonResponseB()
                 key=`echo $line| awk -F '#~' '{print $1}'`
                 value=`echo $line|awk -F '#~' '{print $2}'`
                 ImediateReboot=`echo $line|awk -F '#~' '{print $3}'`
+                FeatureName=`echo $key| awk -F. '{print $6}'`
                 rfcLogging "key=$key value=$value ImediateReboot=$ImediateReboot"
+                if [ "$FeatureName" = "PeriodicFWCheck" ] && [ "$value" = "true" ]
+                then
+                    t2CountNotify "SYS_INFO_RFC_PeriodicFWCheck"
+                elif [ "$FeatureName" = "IPv6onLnF" ] && [ "$value" = "true" ]
+                then
+                    t2CountNotify "INFO_IPv6_LNF_Support"
+                fi
                 parseConfigValue $key "$value" $ImediateReboot
             done < $file
             $RFC_SET Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Control.ClearDBEnd bool true

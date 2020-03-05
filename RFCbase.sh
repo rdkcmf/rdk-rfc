@@ -1299,25 +1299,33 @@ parseConfigValue()
             rfcLogging "paramType is $paramType"
             #dmcli get value
             paramValue=`grep "value:" /tmp/.paramRFC | cut -d':' -f3 | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'`
-                        rfcLogging "RFC: old parameter value $paramValue "
+            rfcLogging "RFC: old parameter value $paramValue "
+            isRfcNameSpace=`echo "$paramName" | grep -ci '.X_RDKCENTRAL-COM_RFC.'`
+            # For RFC namespace parameters, always perform RFC_SET. The set handlers will take care of checking if the value is same or different.
             if [ "$paramValue" != "$configValue" ]; then
-                        #dmcli SET
-                        paramSet=`$RFC_SET $paramName $paramType "$configValue" | grep succeed| tr -s ' ' `
-                        if [ -n "$paramSet" ]; then
-                            rfcLogging "RFC:  updated for $paramName from value old=$paramValue, to new=$configValue"
-                                if [ $RebootValue -eq 1 ]; then
-                                        if [ -n "$RfcRebootCronNeeded" ]; then
-                                                RfcRebootCronNeeded=1;
-                                                 rfcLogging "RFC: Enabling RfcRebootCronNeeded since $paramName old value=$paramValue, new value=$configValue, RebootValue=$RebootValue"
-                                        fi
-
-                                fi
-                        else
-                            rfcLogging "RFC: dmcli SET failed for $paramName with value $configValue"
+                #dmcli SET
+                paramSet=`$RFC_SET $paramName $paramType "$configValue" | grep succeed| tr -s ' ' `
+                if [ -n "$paramSet" ]; then
+                    rfcLogging "RFC:  updated for $paramName from value old=$paramValue, to new=$configValue"
+                    if [ $RebootValue -eq 1 ]; then
+                        if [ -n "$RfcRebootCronNeeded" ]; then
+                            RfcRebootCronNeeded=1;
+                            rfcLogging "RFC: Enabling RfcRebootCronNeeded since $paramName old value=$paramValue, new value=$configValue, RebootValue=$RebootValue"
                         fi
-                    else
-                rfcLogging "RFC: For param $paramName new and old values are same value $configValue"
                     fi
+                else
+                    rfcLogging "RFC: dmcli SET failed for $paramName with value $configValue"
+                fi
+            elif [ $isRfcNameSpace -eq 1 ]; then
+                paramSet=`$RFC_SET $paramName $paramType "$configValue" | grep succeed| tr -s ' ' `
+                if [ -n "$paramSet" ]; then
+                   rfcLogging "RFC: dmcli SET called for RFC namespace param: $paramName value=$configValue"
+                else
+                    rfcLogging "RFC: dmcli SET failed for $paramName with value $configValue"
+                fi
+            else
+                rfcLogging "RFC: For param $paramName new and old values are same value $configValue"
+            fi
         else
             rfcLogging "dmcli GET failed for $paramName "
         fi
@@ -1337,6 +1345,7 @@ processJsonResponseB()
             $RFC_SET Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.CodebigSupport bool false
             $RFC_SET Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.ContainerSupport bool false
             RfcRebootCronNeeded=0;
+            $RFC_SET Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Control.ClearDB bool true
             # here #~ is a delimiter to cut key, value and ImediateReboot values
             while read line; do
                 key=`echo $line| awk -F '#~' '{print $1}'`
@@ -1345,6 +1354,7 @@ processJsonResponseB()
                 rfcLogging "key=$key value=$value ImediateReboot=$ImediateReboot"
                 parseConfigValue $key "$value" $ImediateReboot
             done < $file
+            $RFC_SET Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Control.ClearDBEnd bool true
         else
             rfcLogging "$DCM_PARSER_RESPONSE is not present"
         fi

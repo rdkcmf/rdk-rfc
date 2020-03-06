@@ -263,26 +263,24 @@ getVODId()
 ###########################################################################
 rfcGet () # $1 Name
 {
-    if [ "$DEVICE_TYPE" = "broadband" ]; then
-        dmcli eRT getv $1
-    elif [ "$DEVICE_TYPE" = "XHC1" ]; then
-        dmcli -g $1
+    if [ "$DEVICE_TYPE" = "broadband" ] || [ "$DEVICE_TYPE" = "XHC1" ]; then
+        $RFC_GET $1 | grep value | cut -f3 -d : | cut -f2 -d " "
     else
-        tr181 $1
+        $RFC_GET $1  2>&1 > /dev/null
+
     fi
 }
 
 rfcSet () # $1 Name $2 Type $3 Value
 {
     if [ "$DEVICE_TYPE" = "broadband" ]; then
-        dmcli eRT setv $1 $2 $3
+        $RFC_SET $1 $2 $3
     elif [ "$DEVICE_TYPE" = "XHC1" ]; then
-        dmcli -s $1="$3"
+        $RFC_SET $1="$3"
     else
-        tr181 -s -t s -v $3 $1
+        $RFC_SET -v $3 $1
     fi
 }
-
 
 ###########################################################################
 ## Prerocess the response, so that it could be parsed for features       ##
@@ -802,7 +800,7 @@ sendHttpRequestToServer()
 
     if [ $firmwareVersion =  $lastFirmware ]; then
         if [ "$rfcState" == "INIT" ]; then
-            paramValue=`rfcGet ${XCONF_SELECTOR_TR181_NAME}  2>&1 > /dev/null`
+            paramValue=`rfcGet ${XCONF_SELECTOR_TR181_NAME}`
             if [ "$paramValue" != "prod" ]; then
                 valueHash="OVERRIDE_HASH"
                 valueTime="0"

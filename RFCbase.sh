@@ -173,9 +173,13 @@ fi
 
 ## RETRY DELAY in secs
 RETRY_DELAY=60
+CB_RETRY_DELAY=10
 ## RETRY COUNT
 RETRY_COUNT=3
+CB_RETRY_COUNT=3
 DIRECT_BLOCK_FILENAME="/tmp/.lastdirectfail_rfc"
+CB_BLOCK_FILENAME="/tmp/.lastcodebigfail_rfc"
+
 default_IP=$DEFAULT_IP
 
 # store the working copy to VARFILE
@@ -206,8 +210,36 @@ RfcRebootCronNeeded=0
 #---------------------------------
 IsDirectBlocked()
 {
-    ret=0
-    return $ret
+    directret=0
+    if [ -f $DIRECT_BLOCK_FILENAME ]; then
+        modtime=$(($(date +%s) - $(date +%s -r $DIRECT_BLOCK_FILENAME)))
+        remtime=$((($DIRECT_BLOCK_TIME/3600) - ($modtime/3600)))
+        if [ "$modtime" -le "$DIRECT_BLOCK_TIME" ]; then
+            rfcLogging "RFC: Last direct failed blocking is still valid for $remtime hrs, preventing direct"
+            directret=1
+        else
+            rfcLogging "RFC: Last direct failed blocking has expired, removing $DIRECT_BLOCK_FILENAME, allowing direct"
+            rm -f $DIRECT_BLOCK_FILENAME
+        fi
+    fi
+    return $directret
+}
+
+IsCodeBigBlocked()
+{
+    codebigret=0
+    if [ -f $CB_BLOCK_FILENAME ]; then
+        modtime=$(($(date +%s) - $(date +%s -r $CB_BLOCK_FILENAME)))
+        cbremtime=$((($CB_BLOCK_TIME/60) - ($modtime/60)))
+        if [ "$modtime" -le "$CB_BLOCK_TIME" ]; then
+            rfcLogging "RFC: Last Codebig failed blocking is still valid for $cbremtime mins, preventing Codebig"
+            codebigret=1
+        else
+            rfcLogging "RFC: Last Codebig failed blocking has expired, removing $CB_BLOCK_FILENAME, allowing Codebig"
+            rm -f $CB_BLOCK_FILENAME
+        fi
+    fi
+    return $codebigret
 }
 
 ## Get ECM mac address
@@ -770,10 +802,12 @@ sendHttpRequestToServer()
     EnableOCSP="/tmp/.EnableOCSPCA"
 
     #Create json string
-    if [ "$DEVICE_TYPE" = "broadband" ]; then 
+    if [ "$DEVICE_TYPE" = "broadband" ]; then
         JSONSTR='estbMacAddress='$(getErouterMacAddress)'&firmwareVersion='$(getFWVersion)'&env='$(getBuildType)'&model='$(getModel)'&ecmMacAddress='$(getMacAddress)'&controllerId='$(getControllerId)'&channelMapId='$(getChannelMapId)'&vodId='$(getVODId)'&partnerId='$(getPartnerId)'&accountId='$(getAccountId)'&experience='$(getExperience)'&version=2'
     elif [ "$DEVICE_TYPE" = "XHC1" ]; then
         JSONSTR='estbMacAddress='$(getEstbMacAddress)'&firmwareVersion='$(getFWVersion)'&env='$(getBuildType)'&model='$(getModel)'&accountHash='$(getAccountHash)'&partnerId='$(getPartnerId)'&accountId='$(getAccountId)'&experience='$(getExperience)'&version=2'
+    elif [ "$DEVICE_TYPE" = "mediaclient" ]; then
+        JSONSTR='estbMacAddress='$(getEstbMacAddress)'&firmwareVersion='$(getFWVersion)'&env='$(getBuildType)'&model='$(getModel)'&controllerId='$(getControllerId)'&channelMapId='$(getChannelMapId)'&vodId='$(getVODId)'&partnerId='$(getPartnerId)'&accountId='$(getAccountId)'&experience='$(getExperience)'&version=2'
     else
         JSONSTR='estbMacAddress='$(getEstbMacAddress)'&firmwareVersion='$(getFWVersion)'&env='$(getBuildType)'&model='$(getModel)'&ecmMacAddress='$(getECMMacAddress)'&controllerId='$(getControllerId)'&channelMapId='$(getChannelMapId)'&vodId='$(getVODId)'&partnerId='$(getPartnerId)'&accountId='$(getAccountId)'&experience='$(getExperience)'&version=2'
     fi
@@ -927,7 +961,7 @@ sendHttpRequestToServer()
         XconfEndpoint="$rfcSelectOpt"
         rfcLogging "STORRING XCONF URL AND SLOT NAME"
         rfcSet ${XCONF_SELECTOR_TR181_NAME} string "$rfcSelectOpt" >> $RFC_LOG_FILE
-        rfcSet ${XCONF_URL_TR181_NAME} string "$rfcSelectUrl" >> $RFC_LOG_FILE    
+        rfcSet ${XCONF_URL_TR181_NAME} string "$rfcSelectUrl" >> $RFC_LOG_FILE
 
     fi
     rfcLogging "resp = $resp"
@@ -1010,6 +1044,119 @@ waitForIpAcquisition()
         fi
     done
 }
+
+sendHttpRequest()
+{
+    count=0
+    retSx=1
+    sendHttpRequestToServer $FILENAME $URL $UseCodebig
+    retSx=$?
+    rfcLogging "sendHttpRequestToServer returned $retSx"
+    if [ "$rfcState" == "REDO" ]; then
+        # We have to abandon this data and start new request to redirect to new Xconf
+        rm -f $RFC_WRITE_LOCK
+        return 2
+    fi
+
+    #If sendHttpRequestToServer method fails
+    if [ $retSx -ne 0 ]; then
+        rfcLogging "Processing Response Failed!!"
+        count=$((count + 1))
+        if [ $count -eq $RETRY_COUNT ]; then
+            if [ "$DEVICE_TYPE" !=  "XHC1" ];then
+                if [ $CodebigAvailable -eq 1 ]; then
+                    if [ $UseCodebig -eq 1 ]; then
+                        IsDirectBlocked
+                        skipdirect=$?           # check to see if direct communication is allowed
+                        if [ $skipdirect -eq 0 ]; then  # if direct is allowed
+                            UseCodebig=0                # fallback to direct
+                        else
+                            count=$((count + 1))    # force exit below, no need to continue
+                        fi
+                    else
+                        UseCodebig=1                # we were direct, try Codebig fallback
+                    fi
+                else
+                    count=$((count + 1))    # force exit below
+                fi
+            else #XHC1 - Codebig tries
+                #reset counter and retry count for codebig tries
+                if [ $UseCodebig -eq 0 ]; then
+                    UseCodebig=1
+                    count=0
+                    RETRY_COUNT=2
+                fi
+            fi
+        fi
+
+        if [ $count -gt $RETRY_COUNT ]; then
+            rfcLogging "$RETRY_COUNT tries failed. Giving up..."
+        fi
+        rfcLogging "count = $count. Sleeping $RETRY_DELAY seconds ..."
+        rm -rf $FILENAME $HTTP_CODE
+        sleep $RETRY_DELAY
+    else
+        rm -rf $HTTP_CODE
+    fi
+}
+
+sendHttpCBRequest()
+{
+    cbretries=0
+    cbretSx=1
+    IsCodeBigBlocked
+    skipcodebig=$?
+    if [ $skipcodebig -eq 0 ]; then
+        while [ $cbretries -le $CB_RETRY_COUNT ]
+        do
+            rfcLogging "CallXconf: Attempting sendHttpRequestToServer Codebig connection"
+            sendHttpRequestToServer $FILENAME $URL $UseCodebig
+            cbretSx=$?
+            if [ $cbretSx -eq 0 ]; then
+                rfcLogging "CallXconf: sendHttpRequestToServer Codebig connection success"
+                if [ "$rfcState" == "REDO" ]; then
+                    # We have to abandon this data and start new request to redirect to new Xconf
+                    rm -f $RFC_WRITE_LOCK
+                    return 2
+                fi
+                break
+            fi
+            rfcLogging "CallXconf: sendHttpRequestToServer Codebig connection returned cbretry: $cbretries ret: $cbretSx"
+            cbretries=`expr $cbretries + 1`
+            sleep $CB_RETRY_DELAY
+            rm -rf $FILENAME $HTTP_CODE
+        done
+    fi
+}
+
+sendHttpDirectRequest()
+{
+    retries=0
+    directretSx=1
+    IsDirectBlocked
+    skipdirect=$?
+    if [ $skipdirect -eq 0 ]; then
+        while [ $retries -le $RETRY_COUNT ]
+        do
+            rfcLogging "CallXconf: sendHttpRequestToServer Attempting Direct connection"
+            sendHttpRequestToServer $FILENAME $URL $UseCodebig
+            directretSx=$?
+            if [ $directretSx -eq 0 ]; then
+                rfcLogging "CallXconf: sendHttpRequestToServer Direct connection success"
+                if [ "$rfcState" == "REDO" ]; then
+                    # We have to abandon this data and start new request to redirect to new Xconf
+                    rm -f $RFC_WRITE_LOCK
+                    return 2
+                fi
+                break
+            fi
+            rfcLogging "CallXconf: sendHttpRequestToServer Direct connection returned retry: $retries ret:$directretSx"
+            retries=`expr $retries + 1`
+            sleep $RETRY_DELAY
+            rm -rf $FILENAME $HTTP_CODE
+        done
+    fi
+}
 #####################################################################
 
 #####################################################################
@@ -1018,14 +1165,12 @@ CallXconf()
 
     UseCodebig=0
     CodebigAvailable=0
+    retries=0
+    cbretries=0
     # XB3 platforms doesn't have os-release flag
-    if [ -f /etc/os-release ] || [ "$DEVICE_TYPE" = "broadband" ]; then
+    if [ "$DEVICE_TYPE" = "broadband" ]; then
         if [ -f /usr/bin/configparamgen ]; then
-            if [ "$DEVICE_TYPE" = "broadband" ]; then
-                CodeBigFirst=`$RFC_GET Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.CodeBigFirst.Enable | grep value | cut -f3 -d : | cut -f2 -d " "`
-            else
-                CodeBigFirst=`$RFC_GET -g Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.CodeBigFirst.Enable 2>&1 > /dev/null`
-            fi
+            CodeBigFirst=`$RFC_GET Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.CodeBigFirst.Enable | grep value | cut -f3 -d : | cut -f2 -d " "`
             CodebigAvailable=1
             if [ "$CodeBigFirst" = "true" ]; then
                 rfcLogging "RFC: CodebigFirst is enabled"
@@ -1038,92 +1183,91 @@ CallXconf()
         else
             rfcLogging "RFC: CodebigFirst support is not available"
         fi
+    elif [ "$DEVICE_TYPE" !=  "XHC1" ];then
+        IsDirectBlocked
+        UseCodebig=$?
     fi
 
-    loop=1
-    while [ $loop -eq 1 ]
+    # No need to wait for IP, as the waitForIpAcquisition is called before CallXconf.
+    retSx=1
+    if [ "$DEVICE_TYPE" != "mediaclient" ] && [ "$estbIp" == "$default_IP" ] ; then
+        retSx=0
+    fi
+    while [ $retSx -ne 0 ]
     do
-        if [ ! $estbIp ] ;then
-            #echo "waiting for IP ..."
-            rfcLogging "Waiting for IP"
-            sleep 15
+        sleep 1
+        rfcLogging "CallXconf: Box IP is $estbIp"
+        if [ "$DEVICE_TYPE" == "broadband" ] || [ "$DEVICE_TYPE" ==  "XHC1" ];then
+            sendHttpRequest
         else
-            retSx=1
-            if [ "$DEVICE_TYPE" != "mediaclient" ] && [ "$estbIp" == "$default_IP" ] ; then
-                retSx=0
-            fi
-            count=0
-            while [ $retSx -ne 0 ]
-            do
-                sleep 1
-                loop=0
-                rfcLogging "Box IP is $estbIp"
-
-                sendHttpRequestToServer $FILENAME $URL $UseCodebig
-                retSx=$?
-                rfcLogging "sendHttpRequestToServer returned $retSx"
-                if [ "$rfcState" == "REDO" ]; then
-                    # We have to abandon this data and start new request to redirect to new Xconf
-                    rm -f $RFC_WRITE_LOCK
-                    return 2
-                fi
-
-                #If sendHttpRequestToServer method fails
-                if [ $retSx -ne 0 ]; then
-                    rfcLogging "Processing Response Failed!!"
-                    count=$((count + 1))
-                    if [ $count -eq $RETRY_COUNT ]; then
-                        if [ "$DEVICE_TYPE" !=  "XHC1" ];then
-                            if [ $CodebigAvailable -eq 1 ]; then
-                                if [ $UseCodebig -eq 1 ]; then
-                                    IsDirectBlocked
-                                    skipdirect=$?           # check to see if direct communication is allowed
-                                    if [ $skipdirect -eq 0 ]; then  # if direct is allowed
-                                        UseCodebig=0                # fallback to direct
-                                    else
-                                        count=$((count + 1))    # force exit below, no need to continue
-                                    fi
-                                else
-                                    UseCodebig=1                # we were direct, try Codebig fallback
-                                fi
-                            else
-                                count=$((count + 1))    # force exit below
-                            fi
-                        else #XHC1 - Codebig tries
-                            #reset counter and retry count for codebig tries
-                            if [ $UseCodebig -eq 0 ]; then
-                                UseCodebig=1
-                                count=0
-                                RETRY_COUNT=2
-                            fi
+            if [ $UseCodebig -eq 1 ]; then
+                rfcLogging "CallXconf: Codebig is enabled UseCodebig=$UseCodebig"
+                if [ "$DEVICE_TYPE" == "mediaclient" ]; then
+                    # Use Codebig connection connection on XI platforms
+                    sendHttpCBRequest
+                    if [ $cbretSx -ne 0 ]; then
+                        IsDirectBlocked
+                        skipdirect=$?
+                        if [ $skipdirect -eq 0 ]; then
+                            rfcLogging "CallXconf: sendHttpCBRequest Codebig failed $cbretSx, Switching direct"
+                            UseCodebig=0
+                            sendHttpDirectRequest
+                            echo "CallXconf: sendHttpDirectRequest Direct request failover return=$directretSx"
+                        fi
+                        IsCodeBigBlocked
+                        skipcodebig=$?
+                        if [ $skipcodebig -eq 0 ]; then
+                            rfcLogging "CallXconf: sendHttpCBRequest Codebig Blocking released"
                         fi
                     fi
-
-                    if [ $count -gt $RETRY_COUNT ]; then
-                        rfcLogging "$RETRY_COUNT tries failed. Giving up..."
-                        rm -rf $FILENAME $HTTP_CODE
-                        rfcLogging "Exiting script."
-                        echo 0 > $RFCFLAG
-                        #   exit 0
-                        return 0
+                else
+                    rfcLogging "CallXconf: sendHttpCBRequest Codebig connection not supported"
+                fi
+            else
+                rfcLogging "CallXconf: Codebig is disabled UseCodebig=$UseCodebig"
+                # Use direct connection connection for 3 failures with appropriate backoff/timeout.
+                sendHttpDirectRequest
+                #If sendHttpRequestToServer Direct method fails
+                if [ $directretSx -ne 0 ]; then
+                    if [ "$DEVICE_TYPE" == "mediaclient" ]; then
+                        rfcLogging "CallXconf: sendHttpDirectRequest Direct connection failed $directretSx"
+                        UseCodebig=1
+                        sendHttpCBRequest
+                        if [ $cbretSx -eq 0 ]; then
+                            UseCodebig=1
+                            if [ ! -f $DIRECT_BLOCK_FILENAME ]; then
+                                touch $DIRECT_BLOCK_FILENAME
+                                rfcLogging "CallXconf: sendHttpCBRequest Use CodeBig and Blocking Direct attempts for 24hrs"
+                            fi
+                        else
+                            rfcLogging "CallXconf: sendHttpCBRequest Codebig connection failed $cbretSx"
+                            UseCodebig=0
+                            if [ ! -f $CB_BLOCK_FILENAME ]; then
+                                touch $CB_BLOCK_FILENAME
+                               rfcLogging "CallXconf: sendHttpCBRequest Switch Direct and Blocking Codebig for 30mins"
+                            fi
+                        fi
+                    else
+                        rfcLogging "CallXconf: sendHttpDirectRequest Direct connection failed $directretSx"
                     fi
-                    rfcLogging "count = $count. Sleeping $RETRY_DELAY seconds ..."
-                    rm -rf $FILENAME $HTTP_CODE
-                    sleep $RETRY_DELAY
                 else
                     rm -rf $HTTP_CODE
                 fi
-            done
-            sleep 15
+            fi
+            rm -rf $FILENAME $HTTP_CODE
+            rfcLogging "CallXconf: Exiting script."
+            echo 0 > $RFCFLAG
+            return 0
         fi
     done
+
 # Save cron info
-        if [ "$rfcState" != "INIT" ]; then
+    if [ "$rfcState" != "INIT" ]; then
         if [ -f /tmp/DCMSettings.conf ]
         then
             grep 'urn:settings:CheckSchedule:cron' /tmp/DCMSettings.conf > $PERSISTENT_PATH/tmpDCMSettings.conf
         fi
-        fi
+    fi
 
 # Delete write lock if somehow we did not do it until now
     rm -f $RFC_WRITE_LOCK
@@ -1233,6 +1377,7 @@ fi
 echo 1 > $RFC_SERVICE_LOCK
 rfcLogging "RFC: Starting service, creating lock "
 
+rfcLogging "RFC: Waiting for IP Acquistion..."
 waitForIpAcquisition
 
 rfcLogging "Starting execution of RFCbase.sh"
@@ -1369,9 +1514,9 @@ else
     fi
 fi
 
-     if [ "$RfcRebootCronNeeded" = "1" ] && [ "$DEVICE_TYPE" = "broadband" ]; then
-            #Effectictive Reboot is required for the New RFC config. calling the script which will schedule cron to reboot in maintence w
-            rfcLogging "RFC: RfcRebootCronNeeded=$RfcRebootCronNeeded. calling script to schedule reboot in maintence window "
-            sh /etc/RfcRebootCronschedule.sh &
-     fi
+if [ "$RfcRebootCronNeeded" = "1" ] && [ "$DEVICE_TYPE" = "broadband" ]; then
+    #Effectictive Reboot is required for the New RFC config. calling the script which will schedule cron to reboot in maintence w
+    rfcLogging "RFC: RfcRebootCronNeeded=$RfcRebootCronNeeded. calling script to schedule reboot in maintence window "
+    sh /etc/RfcRebootCronschedule.sh &
+fi
 

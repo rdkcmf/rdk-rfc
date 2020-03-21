@@ -25,10 +25,14 @@
 #include "rfcapi.h"
 #include "cJSON.h"
 #include "rdk_debug.h"
-#include "rfccache.h"
 using namespace std;
 
+#define LOG_RFCAPI  "LOG.RDK.RFCAPI"
 #define TR181_RFC_PREFIX   "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC"
+#define RFCVAR_FILE "/opt/secure/RFC/rfcVariable.ini"
+#define TR181STORE_FILE "/opt/secure/RFC/tr181store.ini"
+#define BOOTSTRAP_FILE "/opt/secure/RFC/bootstrap.ini"
+#define RFCDEFAULTS_FILE "/tmp/rfcdefaults.ini"
 static const char *url = "http://127.0.0.1:11999";
 static bool tr69hostif_http_server_ready = false;
 
@@ -52,6 +56,48 @@ static string prefix()
     return string(buffer);
 }
 #endif
+
+WDMP_STATUS getValue(const char* fileName, const char* pcParameterName, RFC_ParamData_t *pstParam)
+{
+    ifstream ifs_rfcVar(fileName);
+    if (!ifs_rfcVar.is_open())
+    {
+        RDK_LOG (RDK_LOG_ERROR, LOG_RFCAPI, "%s: Trying to open a non-existent file %s \n", __FUNCTION__, fileName);
+    }
+    else
+    {
+        string line;
+        while (getline(ifs_rfcVar, line))
+        {
+            line=line.substr(line.find_first_of(" \t")+1);//Remove any export word that maybe before the key(for rfcVariable.ini)
+            size_t splitterPos = line.find('=');
+            if (splitterPos < line.length())
+            {
+                string key = line.substr(0, splitterPos);
+                if ( !key.compare(pcParameterName) )
+                {
+                   ifs_rfcVar.close();
+                   string value = line.substr(splitterPos+1, line.length());
+                   RDK_LOG(RDK_LOG_DEBUG, LOG_RFCAPI, "Found Key = %s : Value = %s\n", key.c_str(), value.c_str());
+                   if(value.length() > 0)
+                   {
+                      strncpy(pstParam->name, pcParameterName, strlen(pcParameterName));
+                      pstParam->name[strlen(pcParameterName)] = '\0';
+
+                      pstParam->type = WDMP_NONE; //The caller must know what type they are expecting if they are requesting a param before the hostif is ready.
+
+                      strncpy(pstParam->value, value.c_str(), strlen(value.c_str()));
+                      pstParam->value[strlen(value.c_str())] = '\0';
+                      return WDMP_SUCCESS;
+                   }
+                   return WDMP_ERR_VALUE_IS_EMPTY;
+                }
+            }
+        }
+        ifs_rfcVar.close();
+    }
+    return WDMP_FAILURE;
+}
 
 static size_t writeCurlResponse(void *ptr, size_t size, size_t nmemb, string stream)
 {
@@ -93,93 +139,22 @@ WDMP_STATUS getRFCParameter(char *pcCallerID, const char* pcParameterName, RFC_P
 
          if(strncmp(pcParameterName, "RFC_", 4) == 0 && strchr(pcParameterName, '.') == NULL)
          {
-            RFCCache rfcVarCache;
-            bool initDone = rfcVarCache.initCache(RFC_VAR);
-#ifdef TEMP_LOGGING
-            logofs << prefix() << __FUNCTION__ << ": RFCVarCache initDone = " << initDone << endl;
-#endif
-            if (initDone)
-            {
-               string retValue = rfcVarCache.getValue(pcParameterName);
-#ifdef TEMP_LOGGING
-               logofs << prefix() << __FUNCTION__ << ": Value for " << pcParameterName << "retrieved from RFCStoreCache = " << retValue << endl;
-#endif
-               if(retValue.length() > 0)
-               {
-                  strncpy(pstParam->name, pcParameterName, strlen(pcParameterName));
-                  pstParam->name[strlen(pcParameterName)] = '\0';
-
-                  pstParam->type = WDMP_STRING; //default to string for RFC Variables as they don't follow data-model.xml
-
-                  strncpy(pstParam->value, retValue.c_str(), strlen(retValue.c_str()));
-                  pstParam->value[strlen(retValue.c_str())] = '\0';
-
-                  return WDMP_SUCCESS;
-               }
-               else {
-                  return WDMP_ERR_VALUE_IS_EMPTY;
-               }
-            }
+            return getValue(RFCVAR_FILE, pcParameterName, pstParam);
          }
          else
          {
-            RFCCache rfcStoreCache;
-            bool initDone = rfcStoreCache.initCache(RFC_TR181_STORE);
-#ifdef TEMP_LOGGING
-            logofs << prefix() << __FUNCTION__ << ": RFCStoreCache initDone = " << initDone << endl;
-#endif
-            if (initDone)
-            {
-               string retValue = rfcStoreCache.getValue(pcParameterName);
-#ifdef TEMP_LOGGING
-               logofs << prefix() << __FUNCTION__ << ": Value for " << pcParameterName << "retrieved from RFCStoreCache = " << retValue << endl;
-#endif
-               if(retValue.length() > 0)
-               {
-                  strncpy(pstParam->name, pcParameterName, strlen(pcParameterName));
-                  pstParam->name[strlen(pcParameterName)] = '\0';
-
-                  pstParam->type = WDMP_NONE; //The caller must know what type they are expecting if they are requesting a param before the hostif is ready.
-
-                  strncpy(pstParam->value, retValue.c_str(), strlen(retValue.c_str()));
-                  pstParam->value[strlen(retValue.c_str())] = '\0';
-
-                  return WDMP_SUCCESS;
-               }
-               else {
-                  return WDMP_ERR_VALUE_IS_EMPTY;
-               }
-            }
+            ret = getValue(TR181STORE_FILE, pcParameterName, pstParam);
+            if (WDMP_SUCCESS == ret)
+               return WDMP_SUCCESS;
 
             // If the param is not found in tr181store.ini, also search in bootstrap.ini. When the hostif is not ready we do not know whether the requested param is regular tr181 param or bootstrap param.
-            RFCCache bsStoreCache;
-            initDone = bsStoreCache.initCache(RFC_BS_STORE);
-#ifdef TEMP_LOGGING
-            logofs << prefix() << __FUNCTION__ << ": BSStoreCache initDone = " << initDone << endl;
-#endif
-            if (initDone)
-            {
-               string retValue = bsStoreCache.getValue(pcParameterName);
-#ifdef TEMP_LOGGING
-               logofs << prefix() << __FUNCTION__ << ": Value for " << pcParameterName << "retrieved from BSStoreCache = " << retValue << endl;
-#endif
-               if(retValue.length() > 0)
-               {
-                  strncpy(pstParam->name, pcParameterName, strlen(pcParameterName));
-                  pstParam->name[strlen(pcParameterName)] = '\0';
+            ret = getValue(BOOTSTRAP_FILE, pcParameterName, pstParam);
+            if (WDMP_SUCCESS == ret)
+               return WDMP_SUCCESS;
 
-                  pstParam->type = WDMP_NONE; //The caller must know what type they are expecting if they are requesting a param before the hostif is ready.
+            // If the param is not found in override files, find it in rfcdefaults.
+            return getValue(RFCDEFAULTS_FILE, pcParameterName, pstParam);
 
-                  strncpy(pstParam->value, retValue.c_str(), strlen(retValue.c_str()));
-                  pstParam->value[strlen(retValue.c_str())] = '\0';
-
-                  return WDMP_SUCCESS;
-               }
-            }
-#ifdef TEMP_LOGGING
-            logofs << prefix() << __FUNCTION__ << ": Param " << pcParameterName << ": is not available before http server is ready " << endl;
-#endif
-            return WDMP_FAILURE;
          }
       }
       else

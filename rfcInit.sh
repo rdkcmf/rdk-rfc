@@ -97,6 +97,7 @@ if [ "$DEVICE_TYPE" != "broadband" ]; then
 	else 
 		echo "RFC: No Transition - Old time $oldTime is SMALLER then new time $newTime." >> $RFC_LOG_FILE
 	fi
+	cat /etc/rfcdefaults/* > /tmp/rfcdefaults.ini
 fi
 	
 

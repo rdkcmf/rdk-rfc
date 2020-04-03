@@ -179,6 +179,7 @@ RETRY_COUNT=3
 CB_RETRY_COUNT=1
 DIRECT_BLOCK_FILENAME="/tmp/.lastdirectfail_rfc"
 CB_BLOCK_FILENAME="/tmp/.lastcodebigfail_rfc"
+FORCE_DIRECT_ONCE="/tmp/.forcedirectonce_rfc"
 
 default_IP=$DEFAULT_IP
 
@@ -211,15 +212,17 @@ RfcRebootCronNeeded=0
 IsDirectBlocked()
 {
     directret=0
-    if [ -f $DIRECT_BLOCK_FILENAME ]; then
-        modtime=$(($(date +%s) - $(date +%s -r $DIRECT_BLOCK_FILENAME)))
-        remtime=$((($DIRECT_BLOCK_TIME/3600) - ($modtime/3600)))
-        if [ "$modtime" -le "$DIRECT_BLOCK_TIME" ]; then
-            rfcLogging "RFC: Last direct failed blocking is still valid for $remtime hrs, preventing direct"
-            directret=1
-        else
-            rfcLogging "RFC: Last direct failed blocking has expired, removing $DIRECT_BLOCK_FILENAME, allowing direct"
-            rm -f $DIRECT_BLOCK_FILENAME
+    if [ "$DEVICE_TYPE" != "broadband" ]; then
+        if [ -f $DIRECT_BLOCK_FILENAME ]; then
+            modtime=$(($(date +%s) - $(date +%s -r $DIRECT_BLOCK_FILENAME)))
+            remtime=$((($DIRECT_BLOCK_TIME/3600) - ($modtime/3600)))
+            if [ "$modtime" -le "$DIRECT_BLOCK_TIME" ]; then
+                rfcLogging "RFC: Last direct failed blocking is still valid for $remtime hrs, preventing direct"
+                directret=1
+            else
+                rfcLogging "RFC: Last direct failed blocking has expired, removing $DIRECT_BLOCK_FILENAME, allowing direct"
+                rm -f $DIRECT_BLOCK_FILENAME
+            fi
         fi
     fi
     return $directret
@@ -1048,7 +1051,6 @@ waitForIpAcquisition()
 
 sendHttpRequest()
 {
-    count=0
     retSx=1
     sendHttpRequestToServer $FILENAME $URL $UseCodebig
     retSx=$?
@@ -1056,29 +1058,17 @@ sendHttpRequest()
     if [ "$rfcState" == "REDO" ]; then
         # We have to abandon this data and start new request to redirect to new Xconf
         rm -f $RFC_WRITE_LOCK
-        return 2
     fi
 
     #If sendHttpRequestToServer method fails
     if [ $retSx -ne 0 ]; then
         rfcLogging "Processing Response Failed!!"
         count=$((count + 1))
-        if [ $count -eq $RETRY_COUNT ]; then
-            if [ "$DEVICE_TYPE" !=  "XHC1" ];then
-                if [ $CodebigAvailable -eq 1 ]; then
-                    if [ $UseCodebig -eq 1 ]; then
-                        IsDirectBlocked
-                        skipdirect=$?           # check to see if direct communication is allowed
-                        if [ $skipdirect -eq 0 ]; then  # if direct is allowed
-                            UseCodebig=0                # fallback to direct
-                        else
-                            count=$((count + 1))    # force exit below, no need to continue
-                        fi
-                    else
-                        UseCodebig=1                # we were direct, try Codebig fallback
-                    fi
-                else
-                    count=$((count + 1))    # force exit below
+        if [ $count -ge $RETRY_COUNT ]; then
+            if [ "$DEVICE_TYPE" !=  "XHC1" ];then    # broadband devices in here
+                if [ $UseCodebig -eq 1 ]; then
+                    [ -f $CB_BLOCK_FILENAME ] || touch $CB_BLOCK_FILENAME
+                    touch $FORCE_DIRECT_ONCE
                 fi
             else #XHC1 - Codebig tries
                 #reset counter and retry count for codebig tries
@@ -1090,12 +1080,23 @@ sendHttpRequest()
             fi
         fi
 
-        if [ $count -gt $RETRY_COUNT ]; then
+        if [ $count -ge $RETRY_COUNT ]; then
             rfcLogging "$RETRY_COUNT tries failed. Giving up..."
+            retSx=0    # breaks the caller's while loop
+        else
+            if [ "$DEVICE_TYPE" == "broadband" ]; then
+                if [ "$count" -eq "1" ]; then
+                    sleep_time=10
+                else
+                    sleep_time=30
+                fi
+            else
+                sleep_time=$RETRY_DELAY
+            fi
+            rfcLogging "count = $count. Sleeping $sleep_time seconds ..."
+            sleep $sleep_time
         fi
-        rfcLogging "count = $count. Sleeping $RETRY_DELAY seconds ..."
         rm -rf $FILENAME $HTTP_CODE
-        sleep $RETRY_DELAY
     else
         rm -rf $HTTP_CODE
     fi
@@ -1168,18 +1169,22 @@ CallXconf()
     CodebigAvailable=0
     retries=0
     cbretries=0
-    # XB3 platforms doesn't have os-release flag
+    count=0
     if [ "$DEVICE_TYPE" = "broadband" ]; then
+        CB_BLOCK_TIME=1800
         if [ -f /usr/bin/configparamgen ]; then
-            CodeBigFirst=`$RFC_GET Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.CodeBigFirst.Enable | grep value | cut -f3 -d : | cut -f2 -d " "`
             CodebigAvailable=1
-            if [ "$CodeBigFirst" = "true" ]; then
+            CodeBigFirst=`$RFC_GET Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.CodeBigFirst.Enable | grep value | cut -f3 -d : | cut -f2 -d " "`
+            IsCodeBigBlocked
+            CodebigBlocked=$?
+            if [ "$CodebigBlocked" -eq "1" ] || [ -f $FORCE_DIRECT_ONCE ]; then
+                rfcLogging "RFC: Codebig communication is not allowed at this time"
+                rm -f $FORCE_DIRECT_ONCE
+            elif [ "$CodeBigFirst" = "true" ]; then
                 rfcLogging "RFC: CodebigFirst is enabled"
                 UseCodebig=1
             else
                 rfcLogging "RFC: CodebigFirst is disabled"
-                IsDirectBlocked
-                UseCodebig=$?
             fi
         else
             rfcLogging "RFC: CodebigFirst support is not available"

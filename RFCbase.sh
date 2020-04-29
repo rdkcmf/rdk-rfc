@@ -850,7 +850,7 @@ sendHttpRequestToServer()
         valueTime="0"
     fi
 
-    if [ $TryWithCodeBig -eq 1 ]; then
+    if [ "$TryWithCodeBig" = "1" ]; then
         rfcLogging "Attempt to get RFC settings"
 
         SIGN_CMD="configparamgen $rfcSelectorSlot \"$JSONSTR\""

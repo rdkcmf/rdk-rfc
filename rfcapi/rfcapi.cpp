@@ -21,7 +21,7 @@
 #include <sstream>
 #include <curl/curl.h>
 #include <string>
-
+#include <dirent.h>
 #include "rfcapi.h"
 #include "cJSON.h"
 #include "rdk_debug.h"
@@ -33,6 +33,8 @@ using namespace std;
 #define TR181STORE_FILE "/opt/secure/RFC/tr181store.ini"
 #define BOOTSTRAP_FILE "/opt/secure/RFC/bootstrap.ini"
 #define RFCDEFAULTS_FILE "/tmp/rfcdefaults.ini"
+#define RFCDEFAULTS_ETC_DIR "/etc/rfcdefaults/"
+
 static const char *url = "http://127.0.0.1:11999";
 static bool tr69hostif_http_server_ready = false;
 
@@ -57,14 +59,49 @@ static string prefix()
 }
 #endif
 
+bool init_rfcdefaults()
+{
+   DIR *dir;
+   struct dirent *ent;
+   if ((dir = opendir ( RFCDEFAULTS_ETC_DIR )) != NULL)
+   {
+      std::ofstream combined_file( RFCDEFAULTS_FILE ) ;
+      while ((ent = readdir (dir)) != NULL )
+      {
+         if (strstr(ent->d_name, ".ini"))
+         {
+            RDK_LOG (RDK_LOG_DEBUG, LOG_RFCAPI,"rfcdefaults file: %s\n", ent->d_name);
+            string filepath = RFCDEFAULTS_ETC_DIR;
+            std::ifstream file1( filepath.append(ent->d_name) ) ;
+            combined_file << file1.rdbuf();
+         }
+      }
+      closedir (dir);
+   }
+   else
+   {
+      RDK_LOG (RDK_LOG_ERROR, LOG_RFCAPI,"Could not open dir %s \n", RFCDEFAULTS_ETC_DIR) ;
+      return false;
+   }
+   return true;
+}
+
 WDMP_STATUS getValue(const char* fileName, const char* pcParameterName, RFC_ParamData_t *pstParam)
 {
     ifstream ifs_rfcVar(fileName);
     if (!ifs_rfcVar.is_open())
     {
         RDK_LOG (RDK_LOG_ERROR, LOG_RFCAPI, "%s: Trying to open a non-existent file %s \n", __FUNCTION__, fileName);
+        if ( strcmp(fileName, RFCDEFAULTS_FILE) == 0 && init_rfcdefaults() )
+        {
+            RDK_LOG(RDK_LOG_DEBUG, LOG_RFCAPI, "Trying to open %s after newly creating\n", RFCDEFAULTS_FILE);
+            ifs_rfcVar.open(RFCDEFAULTS_FILE, ifstream::in);
+            if (!ifs_rfcVar.is_open())
+                return WDMP_FAILURE;
+        }
+        else
+            return WDMP_FAILURE;
     }
-    else
     {
         string line;
         while (getline(ifs_rfcVar, line))

@@ -832,7 +832,7 @@ sendHttpRequestToServer()
     fi
 
 
-    if [ $firmwareVersion =  $lastFirmware ]; then
+    if [ "$firmwareVersion" =  "$lastFirmware" ]; then
         if [ "$rfcState" == "INIT" ]; then
             paramValue=`rfcGet ${XCONF_SELECTOR_TR181_NAME}`
             if [ "$paramValue" != "prod" ]; then
@@ -867,6 +867,8 @@ sendHttpRequestToServer()
     else
         if [ -f $EnableOCSPStapling ] || [ -f $EnableOCSP ]; then
             CURL_CMD="curl -w '%{http_code}\n'  -D "/tmp/curl_header" "$IF_FLAG" --cert-status --connect-timeout $timeout -m $timeout "$TLSFLAG"  -H "configsethash:$valueHash" -H "configsettime:$valueTime" -o  \"$FILENAME\" '$URL$JSONSTR'"
+	elif [ "$mTLS_RPI" == "true" ] ; then
+            CURL_CMD="curl --cert-type pem --cert /etc/ssl/certs/refplat-xconf-cpe-clnt.xcal.tv.cert.pem --key /tmp/xconf-file.tmp -w '%{http_code}\n'  -D "/tmp/curl_header"  "$IF_FLAG" --connect-timeout $timeout -m $timeout "$TLSFLAG" -H "configsethash:$valueHash" -H "configsettime:$valueTime" -o  \"$FILENAME\" '$URL$JSONSTR'"
         else
             CURL_CMD="curl -w '%{http_code}\n'  -D "/tmp/curl_header" "$IF_FLAG" --connect-timeout $timeout -m $timeout "$TLSFLAG"  -H "configsethash:$valueHash" -H "configsettime:$valueTime" -o  \"$FILENAME\" '$URL$JSONSTR'"
         fi

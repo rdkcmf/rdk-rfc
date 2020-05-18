@@ -176,7 +176,7 @@ RETRY_DELAY=60
 CB_RETRY_DELAY=10
 ## RETRY COUNT
 RETRY_COUNT=3
-CB_RETRY_COUNT=3
+CB_RETRY_COUNT=1
 DIRECT_BLOCK_FILENAME="/tmp/.lastdirectfail_rfc"
 CB_BLOCK_FILENAME="/tmp/.lastcodebigfail_rfc"
 
@@ -1137,7 +1137,7 @@ sendHttpDirectRequest()
     IsDirectBlocked
     skipdirect=$?
     if [ $skipdirect -eq 0 ]; then
-        while [ $retries -le $RETRY_COUNT ]
+        while [ $retries -lt $RETRY_COUNT ]
         do
             rfcLogging "CallXconf: sendHttpRequestToServer Attempting Direct connection"
             sendHttpRequestToServer $FILENAME $URL $UseCodebig

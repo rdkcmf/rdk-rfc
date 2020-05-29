@@ -633,8 +633,9 @@ processJsonResponseV()
                                 fi
 
                                 enable_Check=`echo "$paramName" | grep -ci '.X_RDKCENTRAL-COM_RFC.'`
-                                if [ $enable_Check -eq 0 ]; then
-                                    # This is parameetr outside of RFC namespace and needs to be tested if it is same as already set value
+                                is_Bootstrap=`grep -ci "$paramName" $BS_STORE_FILENAME`
+                                if [ $enable_Check -eq 0 ] && [ $is_Bootstrap -eq 0 ]; then
+                                    # This is parameetr outside of RFC namespace and not a bootstrap so needs to be tested if it is same as already set value
                                     if [ "$paramValue" != "$configValue" ]; then
                                         # new value is different, parameetr must be updated
                                         setConfigValue=1
@@ -642,7 +643,7 @@ processJsonResponseV()
                                         setConfigValue=0
                                     fi
                                 else
-                                    # Parameters in RFC space must be set again since database is cleared
+                                    # Parameters in RFC space or bootstrap must be set again since database is cleared
                                     setConfigValue=1
                                 fi
 

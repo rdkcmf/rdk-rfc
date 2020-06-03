@@ -365,7 +365,9 @@ getFeatures()
 {
     if [ -f "$FILENAME" ]; then
         c1=0    #flag to control feature enable definition
-
+        varName=""
+        enableValue=""
+        instanceName=""
         while read line
         do
         #
@@ -385,11 +387,25 @@ getFeatures()
                 if [ $enable_Check -ne 0 ]; then
                     value2=`echo "$line" | awk '{print $2}'`
                     if [ $value2 =  "enable" ]; then
-                        value6=`echo "$line" | grep enable |awk '{print $5}'`
-
-                        echo -n " $varName=$value6," >> $RFC_TMP_PATH/rfcFeature.list
-                        c1=0
+                        enableValue=`echo "$line" | grep enable |awk '{print $5}'`
                     fi
+                fi
+            # Process feature instance line
+                feature_Check=`echo "$line" | grep -ci 'featureInstance'`
+                if [ $feature_Check -ne 0 ]; then
+                    value2=`echo "$line" | awk '{print $2}'`
+                    if [ $value2 =  "featureInstance" ]; then
+                        instanceName=`echo "$line" | grep featureInstance |awk '{print $6}'`
+                    fi
+                fi
+
+            #now check if data is complete, and if we could report feature configuration
+                if [ "$instanceName" != "" ] && [ "$enableValue" != "" ]; then
+                    echo -n " $instanceName=$enableValue," >> $RFC_TMP_PATH/rfcFeature.list
+                    c1=0
+                    varName=""
+                    enableValue=""
+                    instanceName=""
                 fi
             fi
         done < $FILENAME
@@ -552,8 +568,8 @@ processJsonResponseV()
 
                 fi
 
-    # prepare json file for parsing
-        preProcessFile
+    # prepare json file for parsing and report feature instance list
+        featureReport
 
     # Process RFC configuration
 
@@ -567,7 +583,6 @@ processJsonResponseV()
         # 2) Updating the result in a output file
 
             feature_Check=`echo "$line" | grep -ci 'name'`
-            #echo "--> feature_Check=$feature_Check"
             if [ $feature_Check -ne 0 ]; then
                 value2=`echo "$line" | awk '{print $2}'`
                 if [ $value2 =  "name" ]; then
@@ -588,11 +603,10 @@ processJsonResponseV()
                 if [ $enable_Check -ne 0 ]; then
                     value2=`echo "$line" | awk '{print $2}'`
                     if [ $value2 =  "enable" ]; then
-                        value6=`echo "$line" | grep enable |awk '{print $5}'`
-                        echo "export RFC_ENABLE_$varName=$value6" >> $VARFILE
-                        echo "export RFC_ENABLE_$varName=$value6" >> $rfcVar.ini
-                        rfcLogging "export RFC_ENABLE_$varName = $value6"
-                        echo -n " $varName=$value6," >> $RFC_TMP_PATH/rfcFeature.list
+                        enableValue=`echo "$line" | grep enable |awk '{print $5}'`
+                        echo "export RFC_ENABLE_$varName=$enableValue" >> $VARFILE
+                        echo "export RFC_ENABLE_$varName=$enableValue" >> $rfcVar.ini
+                        rfcLogging "export RFC_ENABLE_$varName = $enableValue"
                     fi
                 fi
 
@@ -695,9 +709,6 @@ processJsonResponseV()
         # will be completed by the time we rename temp copy to reference variable file
         echo 1 > $RFC_WRITE_LOCK
 
-        cp $RFC_TMP_PATH/rfcFeature.list $RFC_PATH/rfcFeature.list
-        rfcLogging "[Features Enabled]-[STAGING]: `cat $RFC_PATH/rfcFeature.list`"
-        t2ValNotify "rfc_split" "`cat $RFC_PATH/rfcFeature.list`"
         # Now move temporary variable files to operational copies
         mv -f $VARFILE $VARIABLEFILE
 

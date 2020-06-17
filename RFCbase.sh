@@ -879,6 +879,19 @@ sendHttpRequestToServer()
     #echo JSONSTR: $JSONSTR
 
     export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/lib:/usr/local/lib
+
+    if [ "$DEVICE_TYPE" = "hybrid" ] || [ "$DEVICE_TYPE" = "mediaclient" ]; then
+        if [ "$BUILD_TYPE" != "prod" ] && [ -f $PERSISTENT_PATH/rfc.properties ]; then
+            rfcLogging "Setting URL to $URL from local override"
+        else
+            XCONF_BS_URL=$(tr181 -g Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Bootstrap.XconfUrl 2>&1)
+            if [ "$XCONF_BS_URL" ]; then
+                URL="$XCONF_BS_URL/featureControl/getSettings"
+                rfcLogging "Setting URL to $URL from Bootstrap config XCONF_BS_URL:$XCONF_BS_URL"
+            fi
+        fi
+    fi
+
     # Generate curl command
     last_char=`echo $URL | awk '$0=$NF' FS=`
     if [ "$last_char" != "?" ]; then
@@ -886,6 +899,7 @@ sendHttpRequestToServer()
     fi
     # force https
     URL=`echo $URL | sed "s/http:/https:/g"`
+
     echo "RFC: Sending request to URL=$URL"
 
     firmwareVersion=$(getFWVersion)
@@ -915,6 +929,15 @@ sendHttpRequestToServer()
         valueTime="0"
     fi
 
+    mTlsEnable="false"
+    if [ "$DEVICE_TYPE" = "hybrid" ] || [ "$DEVICE_TYPE" = "mediaclient" ]; then
+        mTlsEnable=`tr181Set Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.MTLS.mTlsXcSsr.Enable 2>&1 > /dev/null`
+        if [ "$FORCE_MTLS" == "true" ]; then
+            rfcLogging "MTLS preferred"
+            mTlsEnable="true"
+        fi
+    fi
+
     if [ "$TryWithCodeBig" = "1" ]; then
         rfcLogging "Attempt to get RFC settings"
 
@@ -930,19 +953,41 @@ sendHttpRequestToServer()
         CURL_CMD_LOG=`echo "$CURL_CMD" | sed -ne 's#oauth_consumer_key=.*oauth_signature.*#-- <hidden> --#p'`
         rfcLogging "CURL_CMD: $CURL_CMD_LOG"
     else
-        if [ -f $EnableOCSPStapling ] || [ -f $EnableOCSP ]; then
-            CURL_CMD="curl -w '%{http_code}\n'  -D "/tmp/curl_header" "$IF_FLAG" --cert-status --connect-timeout $timeout -m $timeout "$TLSFLAG"  -H "configsethash:$valueHash" -H "configsettime:$valueTime" -o  \"$FILENAME\" '$URL$JSONSTR'"
-        elif [ "$mTLS_RPI" == "true" ] ; then
+        if [ "$mTLS_RPI" == "true" ] ; then
             CURL_CMD="curl --cert-type pem --cert /etc/ssl/certs/refplat-xconf-cpe-clnt.xcal.tv.cert.pem --key /tmp/xconf-file.tmp -w '%{http_code}\n'  -D "/tmp/curl_header"  "$IF_FLAG" --connect-timeout $timeout -m $timeout "$TLSFLAG" -H "configsethash:$valueHash" -H "configsettime:$valueTime" -o  \"$FILENAME\" '$URL$JSONSTR'"
+        elif [ "$mTlsEnable" == "true" ]; then
+            echo "RFC requires Mutual Authentication" >> $RFC_LOG_FILE
+            if [ -d /etc/ssl/certs ]; then
+                if [ ! -f /usr/bin/GetConfigFile ];then
+                    echo "Error: GetConfigFile Not Found" >> $RFC_LOG_FILE
+                    resp=1
+                    return $resp
+                fi
+                ID="/tmp/uydrgopwxyem"
+                GetConfigFile $ID
+            fi
+            CURL_CMD="curl --key /tmp/uydrgopwxyem --cert /etc/ssl/certs/cpe-clnt.xcal.tv.cert.pem -w '%{http_code}\n'  -D "/tmp/curl_header" "$IF_FLAG" --connect-timeout $timeout -m $timeout "$TLSFLAG"  -H "configsethash:$valueHash" -H "configsettime:$valueTime" -o  \"$FILENAME\" '$URL$JSONSTR'"
         else
             CURL_CMD="curl -w '%{http_code}\n'  -D "/tmp/curl_header" "$IF_FLAG" --connect-timeout $timeout -m $timeout "$TLSFLAG"  -H "configsethash:$valueHash" -H "configsettime:$valueTime" -o  \"$FILENAME\" '$URL$JSONSTR'"
         fi
+
+        if [ -f $EnableOCSPStapling ] || [ -f $EnableOCSP ]; then
+            CURL_CMD="$CURL_CMD --cert-status"
+        fi
+
         rfcLogging "CURL_CMD: $CURL_CMD"
     fi
 
     # Execute curl command
     result= eval $CURL_CMD > $HTTP_CODE
     TLSRet=$?
+
+    if [ -f /tmp/uydrgopwxyem ];then
+        rm -rf /tmp/uydrgopwxyem
+    else
+        echo "MTLS not enabled" >> $RFC_LOG_FILE
+    fi
+
     case $TLSRet in
         35|51|53|54|58|59|60|64|66|77|80|82|83|90|91)
             rfcLogging "RFC: HTTPS $TLSFLAG failed to connect to $1 server with curl error code $TLSRet"

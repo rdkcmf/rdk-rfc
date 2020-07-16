@@ -792,6 +792,38 @@ rfcStashRetrieveParams ()
 
 }
 
+##########################################
+## Invalidate Account Id on power cycle ##
+##       (for broadband only)           ##
+##########################################
+rfcGetAccoutId()
+{
+    $RFC_GET Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AccountInfo.AccountID  > /tmp/.paramRFC
+    bkAccountId=`grep "value:" /tmp/.paramRFC | cut -d':' -f3 | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'`
+    
+    if [ -f $RFC_RAM_PATH/.timeValue ] ; then
+        rfcAccountId="$(getAccountId)"
+    else
+        rfcAccountId="Unknown"
+    fi
+}
+
+
+##########################################
+## Check if Account Id has changed      ##
+##       (for broadband only)           ##
+##########################################
+rfcCheckAccoutId()
+{
+    $RFC_GET Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AccountInfo.AccountID  > /tmp/.paramRFC
+    paramValue=`grep "value:" /tmp/.paramRFC | cut -d':' -f3 | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'`
+    
+    if [ "$paramValue" != "$bkAccountId" ]; then
+        rfcLogging "Account Id mismatch: old=$bkAccountId, new=$paramValue"
+    fi
+}
+
+
 #####################################################################
 #####################################
 ## Send Http request to the server ##
@@ -807,7 +839,8 @@ sendHttpRequestToServer()
 
     #Create json string
     if [ "$DEVICE_TYPE" = "broadband" ]; then
-        JSONSTR='estbMacAddress='$(getErouterMacAddress)'&firmwareVersion='$(getFWVersion)'&env='$(getBuildType)'&model='$(getModel)'&ecmMacAddress='$(getMacAddress)'&controllerId='$(getControllerId)'&channelMapId='$(getChannelMapId)'&vodId='$(getVODId)'&partnerId='$(getPartnerId)'&accountId='$(getAccountId)'&experience='$(getExperience)'&version=2'
+        rfcGetAccoutId
+        JSONSTR='estbMacAddress='$(getErouterMacAddress)'&firmwareVersion='$(getFWVersion)'&env='$(getBuildType)'&model='$(getModel)'&ecmMacAddress='$(getMacAddress)'&controllerId='$(getControllerId)'&channelMapId='$(getChannelMapId)'&vodId='$(getVODId)'&partnerId='$(getPartnerId)'&accountId='$rfcAccountId'&experience='$(getExperience)'&version=2'
     elif [ "$DEVICE_TYPE" = "XHC1" ]; then
         JSONSTR='estbMacAddress='$(getEstbMacAddress)'&firmwareVersion='$(getFWVersion)'&env='$(getBuildType)'&model='$(getModel)'&accountHash='$(getAccountHash)'&partnerId='$(getPartnerId)'&accountId='$(getAccountId)'&experience='$(getExperience)'&version=2'
     elif [ "$DEVICE_TYPE" = "mediaclient" ]; then
@@ -871,7 +904,7 @@ sendHttpRequestToServer()
     else
         if [ -f $EnableOCSPStapling ] || [ -f $EnableOCSP ]; then
             CURL_CMD="curl -w '%{http_code}\n'  -D "/tmp/curl_header" "$IF_FLAG" --cert-status --connect-timeout $timeout -m $timeout "$TLSFLAG"  -H "configsethash:$valueHash" -H "configsettime:$valueTime" -o  \"$FILENAME\" '$URL$JSONSTR'"
-	elif [ "$mTLS_RPI" == "true" ] ; then
+        elif [ "$mTLS_RPI" == "true" ] ; then
             CURL_CMD="curl --cert-type pem --cert /etc/ssl/certs/refplat-xconf-cpe-clnt.xcal.tv.cert.pem --key /tmp/xconf-file.tmp -w '%{http_code}\n'  -D "/tmp/curl_header"  "$IF_FLAG" --connect-timeout $timeout -m $timeout "$TLSFLAG" -H "configsethash:$valueHash" -H "configsettime:$valueTime" -o  \"$FILENAME\" '$URL$JSONSTR'"
         else
             CURL_CMD="curl -w '%{http_code}\n'  -D "/tmp/curl_header" "$IF_FLAG" --connect-timeout $timeout -m $timeout "$TLSFLAG"  -H "configsethash:$valueHash" -H "configsettime:$valueTime" -o  \"$FILENAME\" '$URL$JSONSTR'"
@@ -1373,6 +1406,7 @@ processJsonResponseB()
             rfcLogging "ERROR: No $RFC_POSTPROCESS script"
         fi
 
+        rfcCheckAccoutId
     else
         rfcLogging "binary dcmjsonparse is not present"
     fi
@@ -1535,4 +1569,5 @@ if [ "$RfcRebootCronNeeded" = "1" ] && [ "$DEVICE_TYPE" = "broadband" ]; then
     rfcLogging "RFC: RfcRebootCronNeeded=$RfcRebootCronNeeded. calling script to schedule reboot in maintence window "
     sh /etc/RfcRebootCronschedule.sh &
 fi
+
 

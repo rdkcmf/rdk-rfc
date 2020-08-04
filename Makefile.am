@@ -16,4 +16,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 ##########################################################################
-SUBDIRS = rfcapi utils
+SUBDIRS = rfcapi tr181api utils

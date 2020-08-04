@@ -71,6 +71,7 @@ AM_CONDITIONAL([ENABLE_TR181SET_APP], [test x$ENABLE_TR181SET_APP = xtrue])
 AC_CONFIG_FILES([
         Makefile
         rfcapi/Makefile
+        tr181api/Makefile
 	utils/Makefile])
 AC_OUTPUT
 

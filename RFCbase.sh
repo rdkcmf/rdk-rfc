@@ -159,7 +159,7 @@ elif [ "$DEVICE_TYPE" = "XHC1" ]; then
     RFC_SET="dmcli -s"
 else
     RFC_GET="tr181 "
-    RFC_SET="tr181 -s -t s"
+    RFC_SET="tr181 -s -t s -n rfc"
 fi
 
 # File to save curl response

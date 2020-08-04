@@ -36,12 +36,14 @@
 #include <string>
 #include <fstream>
 #include "rfcapi.h"
+#include "tr181api.h"
 #include "trsetutils.h"
 using namespace std;
 
 static char value_type = 'u';
 static char * value = NULL;
 static char * key = NULL;
+static char * id = NULL;
 static REQ_TYPE mode = GET;
 static bool silent = true;
 
@@ -108,7 +110,7 @@ static DATA_TYPE convertType(char type)
 static int getAttribute(char * const paramName)
 {
    RFC_ParamData_t param;
-   WDMP_STATUS status = getRFCParameter(NULL, paramName, &param);
+   WDMP_STATUS status = getRFCParameter(id, paramName, &param);
 
    if(status == WDMP_SUCCESS || status == WDMP_ERR_DEFAULT_VALUE)
    {
@@ -138,11 +140,33 @@ static int setAttribute(char * const paramName  ,char type, char * value)
       paramType = convertType(type);
    }
 
-   WDMP_STATUS status = setRFCParameter(NULL,paramName, value, paramType);
+   WDMP_STATUS status = setRFCParameter(id, paramName, value, paramType);
    if (status != WDMP_SUCCESS)
       cout << __FUNCTION__ << " >> Set operation failed : " << getRFCErrorString(status) << endl;
    else
       cout << __FUNCTION__ << " >> Set operation success " << endl;
+
+   return status;
+}
+
+/**
+* Clears a local setting of a property
+* @param [in] paramName the parameter whose properties are retrieved
+* @return 0 if succesfully clears value, 1 otherwise
+*/
+static int clearAttribute(char * const paramName)
+{
+   RFC_ParamData_t param;
+   int status = clearParam(id, paramName);
+
+   if(status == 0)
+   {
+       cout << __FUNCTION__ << " >> Clear success! " << endl;
+   }
+   else
+   {
+      cout << __FUNCTION__ << " >> Failed to clear." << endl;
+   }
 
    return status;
 }
@@ -170,6 +194,11 @@ static int parseargs(int argc, char * argv[])
             mode = SET;
             i ++;
         }
+        else if(strncasecmp(argv[i], "-c", 2) == 0)
+        {
+            mode = DELETE_ROW;
+            i ++;
+        }
         else if(strncasecmp(argv[i], "-t", 2) == 0)
         {
             if (i + 1 < argc) {
@@ -190,14 +219,19 @@ static int parseargs(int argc, char * argv[])
             i++;
         }
         else if(strncasecmp(argv[i], "-d", 2) == 0)
-   {
+        {
             silent = false;
             i ++;
-   }
+        }
+        else if(strncasecmp(argv[i], "-n", 2) == 0)
+        {
+            id = argv[i+1];
+            i += 2;
+        }
         else
         {
-       if(!silent)
-               cout << __FUNCTION__ << " >>Ignoring input "<<argv[i]<<endl;
+            if(!silent)
+                cout << __FUNCTION__ << " >>Ignoring input "<<argv[i]<<endl;
             i++;
         }
     }
@@ -231,11 +265,14 @@ int main(int argc, char *argv [])
       cout.rdbuf(void_file.rdbuf());
    }
 
-   if(mode != SET)
+   if(mode == GET)
    {
       retcode = getAttribute(key);
    }
-   else if( NULL != value){
+   else if(mode == DELETE_ROW){
+      retcode = clearAttribute(key);
+   }
+   else if( mode == SET && NULL != value){
       retcode = setAttribute(key,value_type, value);
    }
 

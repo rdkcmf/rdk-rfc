@@ -2,7 +2,7 @@
 # If not stated otherwise in this file or this component's Licenses.txt
 # file the following copyright and licenses apply:
 #
-# Copyright 2018 RDK Management
+# Copyright 2016 RDK Management
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,20 +16,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 ##########################################################################
+SUBDIRS = 
 
-bin_PROGRAMS =
 if ENABLE_TR181SET_APP
-bin_PROGRAMS += tr181
+lib_LTLIBRARIES = libtr181api.la
+libtr181api_la_SOURCES = tr181api.cpp
+libtr181api_la_CPPFLAGS = "-std=c++11" -DLINUX -fPIC -g -O2 -Wall -I=/usr/include/wdmp-c -I${top_srcdir}/rfcapi/
+libtr181api_la_LIBADD = -lrdkloggers ../rfcapi/.libs/librfcapi.la
+
+libtr181api_la_includedir = $(includedir)
+libtr181api_la_include_HEADERS = tr181api.h
 endif
-
-if ENABLE_RFCTOOL_APP
-bin_PROGRAMS += rfctool
-endif
-
-tr181_SOURCES = tr181utils.cpp trsetutils.cpp
-tr181_LDADD = ../rfcapi/.libs/librfcapi.la ../tr181api/.libs/libtr181api.la -lIARMBus
-tr181_CPPFLAGS = -std=c++0x -Wall -I${top_srcdir}/rfcapi/ -I${top_srcdir}/tr181api/ -I=/usr/include/wdmp-c -I$(PKG_CONFIG_SYSROOT_DIR)${includedir}/rdk/iarmbus
-
-rfctool_SOURCES = jsonhandler.cpp
-rfctool_LDADD = ${cjson_LIBS}
-rfctool_CPPFLAGS = -std=c++0x -Wall ${cjson_CFLAGS}

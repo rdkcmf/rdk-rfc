@@ -1568,16 +1568,29 @@ then
         cron=`echo "$vc1 $vc2 $vc3 $vc4 $vc5"`
 
         echo "Configuring cron job for RFCbase.sh" >> $RFC_LOG_FILE
-        crontab -l -c /var/spool/cron/ > $current_cron_file
-        sed -i '/[A-Za-z0-9]*RFCbase.sh[A-Za-z0-9]*/d' $current_cron_file
-        if [ "$DEVICE_TYPE" != "XHC1" ]; then
-            echo "$cron /bin/sh $RDK_PATH/RFCbase.sh >> $RFC_LOG_FILE 2>&1" >> $current_cron_file
-        else
-            echo "$cron /bin/sh $RDK_PATH/RFCbase.sh" >> $current_cron_file
+        if [ ! -f /lib/rdk/cronjobs_update.sh ]; then
+            crontab -l -c /var/spool/cron/ > $current_cron_file
+            sed -i '/[A-Za-z0-9]*RFCbase.sh[A-Za-z0-9]*/d' $current_cron_file
         fi
 
-        if [ $cron_update -eq 1 ];then
+        if [ "$DEVICE_TYPE" != "XHC1" ]; then
+            if [ ! -f /lib/rdk/cronjobs_update.sh ]; then
+                echo "$cron /bin/sh $RDK_PATH/RFCbase.sh >> $RFC_LOG_FILE 2>&1" >> $current_cron_file
+            else
+               sh /lib/rdk/cronjobs_update.sh "update" "RFCbase.sh" "$cron /bin/sh $RDK_PATH/RFCbase.sh >> $RFC_LOG_FILE 2>&1"
+            fi
+        else
+            if [ ! -f /lib/rdk/cronjobs_update.sh ]; then
+                echo "$cron /bin/sh $RDK_PATH/RFCbase.sh" >> $current_cron_file
+            else
+                sh /lib/rdk/cronjobs_update.sh "update" "RFCbase.sh" "$cron /bin/sh $RDK_PATH/RFCbase.sh"
+            fi
+        fi
+
+        if [ ! -f /lib/rdk/cronjobs_update.sh ]; then
+            if [ $cron_update -eq 1 ]; then
                 crontab $current_cron_file -c /var/spool/cron/
+            fi
         fi
 
     # Log cron configuration
@@ -1586,7 +1599,9 @@ then
     else
         echo "/var/spool/cron/crontabs/root:" >> $RFC_LOG_FILE
     fi
-        cat $current_cron_file >> $RFC_LOG_FILE
+        if [ ! -f /lib/rdk/cronjobs_update.sh ]; then
+            cat $current_cron_file >> $RFC_LOG_FILE
+        fi
 
 else
     if [ "$DEVICE_TYPE" != "broadband" ]; then

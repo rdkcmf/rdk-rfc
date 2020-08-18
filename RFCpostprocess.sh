@@ -72,4 +72,8 @@ else
     fi
 fi
 
+if [ -f $RDK_PATH/tch_sshwhitlist.sh ]; then
+    sh $RDK_PATH/tch_sshwhitlist.sh &
+fi
+
 echo "[RFC]:: POSTPROCESSING IS COMPLETE !!!" >> $LOG_PATH/rfcscript.log

@@ -50,7 +50,8 @@ if [ "$DEVICE_TYPE" = "broadband" ]; then
           RFC_SSH_FILE="$(ls /tmp/RFC/.RFC_* | grep -i sshwhitelist)"
           if [ -s $RFC_SSH_FILE ] ; then
              echo "RFC File for SSH present. Refreshing Firewall" >> $LOG_PATH/dcmrfc.log
-             sh $RDK_PATH/rfc_refresh.sh SSH_REFRESH &
+             #sh $RDK_PATH/rfc_refresh.sh SSH_REFRESH &
+	     sysevent set firewall-restart
           else
              echo "RFC File for SSH is not present or empty" >> $LOG_PATH/dcmrfc.log
           fi

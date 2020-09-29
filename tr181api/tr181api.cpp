@@ -205,8 +205,7 @@ tr181ErrorCode_t setValue(const char* pcParameterName, const char* pcParamValue)
 
     ifstream ifs_tr181(TR181_LOCAL_STORE_FILE);
     if (!ifs_tr181.is_open()) {
-        RDK_LOG (RDK_LOG_ERROR, LOG_TR181API, "%s: Trying to open a non-existent file [%s] \n", __FUNCTION__, TR181_LOCAL_STORE_FILE);
-        return tr181Failure;
+        RDK_LOG (RDK_LOG_INFO, LOG_TR181API, "%s: Trying to open a non-existent file [%s] \n", __FUNCTION__, TR181_LOCAL_STORE_FILE);
     }
     else
     {

@@ -91,12 +91,16 @@ if [ "$DEVICE_TYPE" != "broadband" ]; then
 	fi
 	
 	## check if RFC transition has to take place from old to new secure location	
-	if [ $oldTime -gt $newTime ] || [ -f $RFC_INIT_LOCK ]; then
-		echo "RFC: Transition - Old time $oldTime is greater then new time $newTime." >> $RFC_LOG_FILE 
-		rfcMoveToNewLoc
-	else 
-		echo "RFC: No Transition - Old time $oldTime is SMALLER then new time $newTime." >> $RFC_LOG_FILE
-	fi
+        if [ -z "$oldTime" ] || [ -z "$newTime" ]; then
+                echo "RFC: Old time or New time is empty. The value of oldTime = $oldTime and newTime = $newTime." >> $RFC_LOG_FILE
+        else
+	        if [ $oldTime -gt $newTime ] || [ -f $RFC_INIT_LOCK ]; then
+		    echo "RFC: Transition - Old time $oldTime is greater then new time $newTime." >> $RFC_LOG_FILE
+		    rfcMoveToNewLoc
+         	else
+		    echo "RFC: No Transition - Old time $oldTime is SMALLER then new time $newTime." >> $RFC_LOG_FILE
+	        fi
+        fi
 	cat /etc/rfcdefaults/* > /tmp/rfcdefaults.ini
 fi
 	

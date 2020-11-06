@@ -22,7 +22,7 @@ if ENABLE_TR181SET_APP
 lib_LTLIBRARIES = libtr181api.la
 libtr181api_la_SOURCES = tr181api.cpp
 libtr181api_la_CPPFLAGS = "-std=c++11" -DLINUX -fPIC -g -O2 -Wall -I=/usr/include/wdmp-c -I${top_srcdir}/rfcapi/
-libtr181api_la_LIBADD = -lrdkloggers ../rfcapi/.libs/librfcapi.la
+libtr181api_la_LIBADD = -lrdkloggers ../rfcapi/.libs/librfcapi.la -lpthread
 
 libtr181api_la_includedir = $(includedir)
 libtr181api_la_include_HEADERS = tr181api.h

@@ -50,7 +50,7 @@ export RDK_TOOLCHAIN_PATH=$RDK_PROJECT_ROOT_PATH/sdk/toolchain/arm-linux-gnueabi
 export RDK_COMPONENT_NAME=${RDK_COMPONENT_NAME-`basename $RDK_SOURCE_PATH`}
 export RDK_DIR=$RDK_PROJECT_ROOT_PATH
 
-if [ "$XCAM_MODEL" == "XHB1" ]; then
+if [ "$XCAM_MODEL" == "XHB1" ] || [ "$XCAM_MODEL" == "XHC3" ]; then
 . ${RDK_PROJECT_ROOT_PATH}/build/components/sdk/setenv2
 else
 export CC=${RDK_TOOLCHAIN_PATH}/bin/arm-linux-gnueabihf-gcc

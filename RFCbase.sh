@@ -1411,7 +1411,7 @@ parseConfigValue()
         if [ -n "$paramType" ]; then
             rfcLogging "paramType is $paramType"
             #dmcli get value
-            paramValue=`grep "value:" /tmp/.paramRFC | cut -d':' -f3 | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'`
+            paramValue=`grep "value:" /tmp/.paramRFC | cut -d':' -f3- | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'`
             rfcLogging "RFC: old parameter value $paramValue "
             isRfcNameSpace=`echo "$paramName" | grep -ci '.X_RDKCENTRAL-COM_RFC.'`
             # For RFC namespace parameters, always perform RFC_SET. The set handlers will take care of checking if the value is same or different.

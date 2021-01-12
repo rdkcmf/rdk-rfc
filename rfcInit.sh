@@ -101,7 +101,11 @@ if [ "$DEVICE_TYPE" != "broadband" ]; then
 		    echo "RFC: No Transition - Old time $oldTime is SMALLER then new time $newTime." >> $RFC_LOG_FILE
 	        fi
         fi
-	cat /etc/rfcdefaults/* > /tmp/rfcdefaults.ini
+
+	if [ ! -f /tmp/rfcdefaults.ini ]; then
+		for f in /etc/rfcdefaults/*.ini; do (cat "${f}"; echo) >> /tmp/rfcdefaults.ini; done
+	else
+		echo "rfcInit: rfcdefaults.ini exist" >> $RFC_LOG_FILE
+	fi
 fi
-	
 

@@ -1134,10 +1134,14 @@ waitForIpAcquisition()
                     loop=0
                 elif [ ! -f /tmp/estb_ipv4 ] && [ ! -f /tmp/estb_ipv6 ]; then
                     sleep 10
-                    rfcLogging "waiting for IPv6 IP"
+                    rfcLogging "waiting for IP flag to be created"
                     let counter++
+                elif [ "Y$estbIp" == "Y$DEFAULT_IP" ] && [ -f /tmp/estb_ipv6 ]; then
+                    rfcLogging "waiting for IPv6 IP, estb_ipv6 flag is created"
+                    let counter++
+                    sleep 10    
                 elif [ "Y$estbIp" == "Y$DEFAULT_IP" ] && [ -f /tmp/estb_ipv4 ]; then
-                    rfcLogging "waiting for IPv6 IP"
+                    rfcLogging "waiting for IPv6 IP, estb_ipv4 flag is created"
                     let counter++
                     sleep 10
                 else
@@ -1154,6 +1158,7 @@ waitForIpAcquisition()
             fi
         fi
     done
+    rfcLogging "Acquired Box estb ip : $estbIp , Count = $counter"
 }
 
 sendHttpRequest()

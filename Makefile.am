@@ -16,4 +16,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 ##########################################################################
+if ENABLE_RDKC
+SUBDIRS = rfcapi
+else
 SUBDIRS = rfcapi tr181api utils
+endif

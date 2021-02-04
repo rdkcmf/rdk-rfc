@@ -114,7 +114,7 @@ function configure()
         
     configure_options=" "
     configure_options="--host=arm-linux --target=arm-linux"
-    configure_options="$configure_options  --enable-rfctool"
+    configure_options="$configure_options  --enable-rfctool --enable-tr181set=yes --enable-rdkc=yes"
 
     export cjson_CFLAGS="-I$RDK_PROJECT_ROOT_PATH/opensource/include/cjson"
     export cjson_LIBS="-L$RDK_PROJECT_ROOT_PATH/opensource/lib/ -lcjson"
@@ -164,6 +164,7 @@ function install()
     cp $RDK_PROJECT_ROOT_PATH/rfc/rfc.properties $RDK_FSROOT_PATH/etc/rfc.properties
     cp $RDK_PROJECT_ROOT_PATH/rfc/RfcRebootCronschedule.sh $RDK_FSROOT_PATH/lib/rdk/
     cp $RDK_PROJECT_ROOT_PATH/rfc/RFC_Reboot.sh $RDK_FSROOT_PATH/lib/rdk/
+    cp $RDK_PROJECT_ROOT_PATH/rfc/rfcInit.sh $RDK_FSROOT_PATH/lib/rdk/
     cd ${RDK_SOURCE_PATH}
     make install
 }

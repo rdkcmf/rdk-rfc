@@ -68,6 +68,19 @@ AC_ARG_ENABLE([tr181set],
 
 AM_CONDITIONAL([ENABLE_TR181SET_APP], [test x$ENABLE_TR181SET_APP = xtrue])
 
+AC_ARG_ENABLE([rdkc],
+              AS_HELP_STRING([--enable-rdkc],[enable rdkc (default is no)]),
+              [
+                case "${enableval}" in
+                 yes) ENABLE_RDKC=true;;
+                  no) AC_MSG_ERROR([RDKC is disabled]) ;;
+                   *) AC_MSG_ERROR([bad value ${enableval} for --enable-rdkc]) ;;
+                esac
+              ],
+              [echo "rdkc is disabled"])
+
+AM_CONDITIONAL([ENABLE_RDKC], [test x$ENABLE_RDKC = xtrue])
+
 AC_CONFIG_FILES([
         Makefile
         rfcapi/Makefile

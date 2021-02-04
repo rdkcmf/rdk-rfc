@@ -21,9 +21,18 @@ SUBDIRS =
 if ENABLE_TR181SET_APP
 lib_LTLIBRARIES = librfcapi.la
 librfcapi_la_SOURCES = rfcapi.cpp
+if ENABLE_RDKC
+librfcapi_la_CPPFLAGS = "-std=c++11" -DLINUX -fPIC -g -O2 -Wall -DRDKC -I${top_srcdir}/../rdklogger/include/
+librfcapi_la_LIBADD = -L${top_srcdir}/../rdklogger/src/.libs -lrdkloggers
+else
 librfcapi_la_CPPFLAGS = "-std=c++11" -DLINUX -fPIC -g -O2 -Wall -I=/usr/include/cjson -I=/usr/include/wdmp-c
 librfcapi_la_LIBADD = -lcurl -lcjson -lrdkloggers
+endif
 
 librfcapi_la_includedir = $(includedir)
+if ENABLE_RDKC
 librfcapi_la_include_HEADERS = rfcapi.h
+else
+librfcapi_la_include_HEADERS = rfcapi.h
+endif
 endif

@@ -157,6 +157,7 @@ function rebuild()
 
 function install()
 {
+    mkdir -p $RDK_FSROOT_PATH/lib/rdk/
     cp $RDK_PROJECT_ROOT_PATH/rfc/getRFC.sh $RDK_FSROOT_PATH/lib/rdk/
     cp $RDK_PROJECT_ROOT_PATH/rfc/isFeatureEnabled.sh $RDK_FSROOT_PATH/lib/rdk/
     cp $RDK_PROJECT_ROOT_PATH/rfc/RFCbase.sh $RDK_FSROOT_PATH/lib/rdk/

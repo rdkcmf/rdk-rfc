@@ -641,6 +641,7 @@ processJsonResponseV()
 
         c1=0    #flag to control feature enable definition
         c2=0    #flag to control start parameters
+        RebootValue_xhc1=0  #flag to control reboot in maintainance window based on effectiveImmediate attribute
 
         while read line
         do
@@ -682,6 +683,16 @@ processJsonResponseV()
                     value6=`echo "$line" | grep effectiveImmediate |awk '{print $5}'`
                     echo "export RFC_$varName"_effectiveImmediate"=$value6" >> $VARFILE
                     echo "export RFC_$varName"_effectiveImmediate"=$value6" >> $rfcVar.ini
+
+                    if [ "$DEVICE_TYPE" = "XHC1" ]; then
+                        # Here value6 gives the value for the key: effectiveImmediate
+                        if [ $value6 = "true" ]; then
+                            RebootValue_xhc1=1
+                            rfcLogging "RFC: Enabling Reboot flag for $varName"
+                        else
+                            RebootValue_xhc1=0
+                        fi
+                    fi
                 fi
 
                 # Check for configData
@@ -744,6 +755,17 @@ processJsonResponseV()
                                 else
                                     # Parameters in RFC space or bootstrap must be set again since database is cleared
                                     setConfigValue=1
+                                fi
+
+                                if [ "$DEVICE_TYPE" = "XHC1" ]; then
+                                    if [ "$paramValue" != "$configValue" ]; then
+                                        if [ $RebootValue_xhc1 -eq 1 ]; then
+                                            if [ -n "$RfcRebootCronNeeded" ]; then
+                                                RfcRebootCronNeeded=1;
+                                                rfcLogging "RFC: Enabling RfcRebootCronNeeded since $paramName old value=$paramValue, new value=$configValue, Immediate reboot=$RebootValue_xhc1"
+                                            fi
+                                        fi
+                                    fi
                                 fi
 
                                 if [ $setConfigValue -ne 0 ]; then
@@ -1786,10 +1808,17 @@ else
     fi
 fi
 
-if [ "$RfcRebootCronNeeded" = "1" ] && [ "$DEVICE_TYPE" = "broadband" ]; then
-    #Effectictive Reboot is required for the New RFC config. calling the script which will schedule cron to reboot in maintence w
-    rfcLogging "RFC: RfcRebootCronNeeded=$RfcRebootCronNeeded. calling script to schedule reboot in maintence window "
-    sh /etc/RfcRebootCronschedule.sh &
+if [ "$RfcRebootCronNeeded" = "1" ]; then
+    if [ "$DEVICE_TYPE" = "broadband" ] || [ "$DEVICE_TYPE" = "XHC1" ]; then
+        #Effectictive Reboot is required for the New RFC config. calling the script which will schedule cron to reboot in maintainance window
+        rfcLogging "RFC: RfcRebootCronNeeded=$RfcRebootCronNeeded. calling script to schedule reboot in maintence window "
+
+        if [ "$DEVICE_TYPE" = "broadband" ]; then
+            sh /etc/RfcRebootCronschedule.sh &
+        else
+            if [ -f /lib/rdk/RfcRebootCronschedule.sh ]; then
+                sh /lib/rdk/RfcRebootCronschedule.sh &
+            fi
+        fi
+    fi
 fi
-
-

@@ -162,7 +162,8 @@ function install()
     cp $RDK_PROJECT_ROOT_PATH/rfc/RFCbase.sh $RDK_FSROOT_PATH/lib/rdk/
     cp $RDK_PROJECT_ROOT_PATH/rfc/RFCpostprocess.sh $RDK_FSROOT_PATH/lib/rdk/
     cp $RDK_PROJECT_ROOT_PATH/rfc/rfc.properties $RDK_FSROOT_PATH/etc/rfc.properties
-
+    cp $RDK_PROJECT_ROOT_PATH/rfc/RfcRebootCronschedule.sh $RDK_FSROOT_PATH/lib/rdk/
+    cp $RDK_PROJECT_ROOT_PATH/rfc/RFC_Reboot.sh $RDK_FSROOT_PATH/lib/rdk/
     cd ${RDK_SOURCE_PATH}
     make install
 }

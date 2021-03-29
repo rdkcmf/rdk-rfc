@@ -739,7 +739,7 @@ processJsonResponseV()
                                 paramValue=`$RFC_GET $paramName  2>&1 > /dev/null`
                                 elif [ "$DEVICE_TYPE" = "XHC1" ]; then
                                     $RFC_GET $paramName  > /tmp/.paramRFC
-                                    paramValue=`grep "$paramName" /tmp/.paramRFC | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | cut -d' ' -f3`
+                                    paramValue=`grep "$paramName =" /tmp/.paramRFC | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | cut -d' ' -f3`
                                 fi
 
                                 enable_Check=`echo "$paramName" | grep -ci '.X_RDKCENTRAL-COM_RFC.'`
@@ -888,7 +888,7 @@ rfcStashStoreParams ()
         stashAccountId=paramValue=`grep "value:" /tmp/.paramRFC | cut -d':' -f3 | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'`
     elif [ "$DEVICE_TYPE" = "XHC1" ]; then
         $RFC_GET Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AccountInfo.AccountID  > /tmp/.paramRFC
-        stashAccountId=`grep "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AccountInfo.AccountID" /tmp/.paramRFC | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | cut -d' ' -f3`
+        stashAccountId=`grep "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AccountInfo.AccountID =" /tmp/.paramRFC | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | cut -d' ' -f3`
     else
         stashAccountId=`$RFC_GET Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AccountInfo.AccountID  2>&1 > /dev/null`
     fi

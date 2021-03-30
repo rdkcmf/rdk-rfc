@@ -530,9 +530,22 @@ getValidAccountId()
                     else
                        validAccountId=$configValue
                        rfcLogging "NEW valid Account ID: $validAccountId"
-                       if [ $validAccountId != "unknown" ]; then
+                       if [ $validAccountId != "unknown" ] && [ $validAccountId != "Unknown" ]; then
                             rfcState="REDO_WITH_VALID_DATA"
                        fi
+                    fi
+                fi
+
+                enable_Check=`echo "$paramName" | grep -ci 'Device.DeviceInfo.X_RDKCENTRAL-COM_Syndication.PartnerId'`
+                if [ $enable_Check -ne 0 ]; then
+                    if [[ "$configValue" =~ [^a-zA-Z0-9] ]]; then
+                       rfcLogging "Invalid characters in newly received partnerId: $configValue"
+                    else
+                        validPartnerId=$configValue
+                        rfcLogging "NEW valid Partner ID: $validPartnerId"
+                        if [ $validPartnerId != "unknown" ] && [ $validPartnerId != "Unknown" ]; then
+                            rfcState="REDO_WITH_VALID_DATA"
+                        fi
                     fi
                 fi
             fi
@@ -540,12 +553,23 @@ getValidAccountId()
         done < $FILENAME
 
         # If XConf does not send a valid account ID, and device has a valid account ID, re-sync using device account ID.
-        if [ -z "${validAccountId}" ] || [ $validAccountId = "unknown" ]; then
+        if [ -z "${validAccountId}" ] || [ $validAccountId = "unknown" ] || [ $validAccountId = "Unknown" ]; then
             rfcLogging "Account Id from XConf: $validAccountId, is not valid. Re-sync with prior account ID."
-            if [ -z "${bkAccountId}" ] || [ $bkAccountId = "unknown" ]; then
+            if [ -z "${bkAccountId}" ] || [ $bkAccountId = "unknown" ] || [ $bkAccountId = "Unknown" ]; then
                 rfcLogging "Prior Account Id from device=$bkAccountId, is not valid."
             else
                 validAccountId=$bkAccountId
+                rfcState="REDO_WITH_VALID_DATA"
+            fi
+        fi
+
+        # If XConf does not send a valid partner ID, and device has a valid partner ID, re-sync using device partner ID.
+        if [ -z "${validPartnerId}" ] || [ $validPartnerId = "unknown" ] || [ $validPartnerId = "Unknown" ]; then
+            rfcLogging "Partner Id from XConf: $validPartnerId, is not valid. Re-sync with prior partner ID."
+            if [ -z "${bkPartnerId}" ] || [ $bkPartnerId = "unknown" ] || [ $bkPartnerId = "Unknown" ]; then
+                rfcLogging "Prior Partner Id from device=$bkPartnerId, is not valid."
+            else
+                validPartnerId=$bkPartnerId
                 rfcState="REDO_WITH_VALID_DATA"
             fi
         fi
@@ -562,37 +586,40 @@ getValidAccountId()
 preProcessJsonResponse()
 {
 
-    if [ "$rfcState" == "INIT" ]; then
+     if [ "$rfcState" == "INIT" ] || [ "$newFirmwareFirstRequest" ==  "true" ]; then
         if [ -f "$FILENAME" ]; then
             OUTFILE='/tmp/rfc-current.json'
-                        cat /dev/null > $OUTFILE #empty old file
-                        cp $FILENAME $OUTFILE
+            cat /dev/null > $OUTFILE #empty old file
+            cp $FILENAME $OUTFILE
 
             preProcessFile
 
-            if [ "$rfcAccountId" == "Unknown" ]; then
-                if [ "$DEVICE_TYPE" = "hybrid" ] || [ "$DEVICE_TYPE" = "mediaclient" ]; then
-                    # changes the rfcState to REDO_WITH_VALID_DATA
-                    rfcLogging "calling getValidAccountId"
-                    getValidAccountId
-                fi
+            if [ "$newFirmwareFirstRequest" ==  "true" ]; then
+                # changes the rfcState to REDO_WITH_VALID_DATA
+                rfcLogging "calling getValidAccountId"
+                getValidAccountId
+                newFirmwareFirstRequest="false"
             fi
 
             if [ "$rfcState" == "INIT" ]; then
-                #determine next Xconf target
-                rfcLogging "calling getXconfSelect"
-                getXconfSelect
+                if [ "$rfcSelectOpt" == "local" ]; then
+                    rfcState="CONTINUE"
+                else
+                    #determine next Xconf target
+                    rfcLogging "calling getXconfSelect"
+                    getXconfSelect
+                fi
             fi
 
             # Restore original response
             cp $OUTFILE $FILENAME
-                else
+        else
             rfcLogging "ERROR: Processing $rfcState (P2) state BUT $FILENAME is missing"
-                fi
+        fi
     elif [ "$rfcState" == "REDO" ]; then
         # This is second passing and NEW request to Xconf is already completed
         rfcState="CONTINUE"
-        fi
+    fi
 }
 ###########################################################################
 ## Process the response, update the list of variables in rfcVariable.ini ##
@@ -924,17 +951,9 @@ rfcStashRetrieveParams ()
 rfcVideoGetAccountId()
 {
     if [ -z "${validAccountId}" ]; then
-
         bkAccountId=`rfcGet Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AccountInfo.AccountID`
         rfcLogging "RFC: bkAccountId=$bkAccountId"
-        firmwareVersion=$(getFWVersion)
-
-        if [ -f $RFC_PATH/.version ]; then
-            lastFirmware=`cat $RFC_PATH/.version`
-            else
-            lastFirmware=""
-        fi
-
+        
         if [ "$firmwareVersion" =  "$lastFirmware" ]; then
             rfcAccountId="$(getAccountId)"
         else
@@ -943,8 +962,21 @@ rfcVideoGetAccountId()
     else
         rfcAccountId=$validAccountId
     fi
-
     rfcLogging "RFC: rfcAccountID=$rfcAccountId"
+
+    if [ -z "${validPartnerId}" ]; then
+        bkPartnerId=`rfcGet Device.DeviceInfo.X_RDKCENTRAL-COM_Syndication.PartnerId`
+        rfcLogging "RFC: bkPartnerId=$bkPartnerId"
+
+        if [ "$firmwareVersion" =  "$lastFirmware" ]; then
+            rfcPartnerId="$(getPartnerId)"
+        else
+            rfcPartnerId="Unknown"
+        fi
+    else
+        rfcPartnerId=$validPartnerId
+    fi
+    rfcLogging "RFC: rfcPartnerId=$rfcPartnerId"
 }
 
 ##########################################
@@ -957,6 +989,12 @@ rfcVideoCheckAccoutId()
 
     if [ "$paramValue" != "$bkAccountId" ]; then
         rfcLogging "Account Id mismatch: old=$bkAccountId, new=$paramValue"
+    fi
+    
+    paramValue=`rfcGet Device.DeviceInfo.X_RDKCENTRAL-COM_Syndication.PartnerId`
+
+    if [ "$paramValue" != "$bkPartnerId" ]; then
+        rfcLogging "Partner Id mismatch: old=$bkPartnerId, new=$paramValue"
     fi
 }
 
@@ -1013,10 +1051,10 @@ sendHttpRequestToServer()
         JSONSTR='estbMacAddress='$(getEstbMacAddress)'&firmwareVersion='$(getFWVersion)'&env='$(getBuildType)'&model='$(getModel)'&accountHash='$(getAccountHash)'&partnerId='$(getPartnerId)'&accountId='$(getAccountId)'&experience='$(getExperience)'&version=2'
     elif [ "$DEVICE_TYPE" = "mediaclient" ]; then
         rfcVideoGetAccountId
-        JSONSTR='estbMacAddress='$(getEstbMacAddress)'&firmwareVersion='$(getFWVersion)'&env='$(getBuildType)'&model='$(getModel)'&controllerId='$(getControllerId)'&channelMapId='$(getChannelMapId)'&vodId='$(getVODId)'&partnerId='$(getPartnerId)'&accountId='$rfcAccountId'&experience='$(getExperience)'&version=2'
+        JSONSTR='estbMacAddress='$(getEstbMacAddress)'&firmwareVersion='$(getFWVersion)'&env='$(getBuildType)'&model='$(getModel)'&controllerId='$(getControllerId)'&channelMapId='$(getChannelMapId)'&vodId='$(getVODId)'&partnerId='$rfcPartnerId'&accountId='$rfcAccountId'&experience='$(getExperience)'&version=2'
     else
         rfcVideoGetAccountId
-        JSONSTR='estbMacAddress='$(getEstbMacAddress)'&firmwareVersion='$(getFWVersion)'&env='$(getBuildType)'&model='$(getModel)'&ecmMacAddress='$(getECMMacAddress)'&controllerId='$(getControllerId)'&channelMapId='$(getChannelMapId)'&vodId='$(getVODId)'&partnerId='$(getPartnerId)'&accountId='$rfcAccountId'&experience='$(getExperience)'&version=2'
+        JSONSTR='estbMacAddress='$(getEstbMacAddress)'&firmwareVersion='$(getFWVersion)'&env='$(getBuildType)'&model='$(getModel)'&ecmMacAddress='$(getECMMacAddress)'&controllerId='$(getControllerId)'&channelMapId='$(getChannelMapId)'&vodId='$(getVODId)'&partnerId='$rfcPartnerId'&accountId='$rfcAccountId'&experience='$(getExperience)'&version=2'
     fi
     #echo JSONSTR: $JSONSTR
 
@@ -1043,15 +1081,6 @@ sendHttpRequestToServer()
     URL=`echo $URL | sed "s/http:/https:/g"`
 
     echo "RFC: Sending request to URL=$URL"
-
-    firmwareVersion=$(getFWVersion)
-
-    if [ -f $RFC_PATH/.version ]; then
-        lastFirmware=`cat $RFC_PATH/.version`
-        else
-        lastFirmware=""
-    fi
-
 
     if [ "$firmwareVersion" =  "$lastFirmware" ]; then
         if [ "$rfcState" == "INIT" ]; then
@@ -1187,7 +1216,7 @@ sendHttpRequestToServer()
 
             return $resp
         elif [ "$rfcState" == "REDO_WITH_VALID_DATA" ]; then
-            rfcLogging "RFC requires new Xconf request with accountId $validAccountId!!"
+            rfcLogging "RFC requires new Xconf request with accountId $validAccountId, partnerId $validPartnerId!!"
             rfcState="INIT"
             resp=1
 
@@ -1315,7 +1344,7 @@ sendHttpRequest()
     sendHttpRequestToServer $FILENAME $URL $UseCodebig
     retSx=$?
     rfcLogging "sendHttpRequestToServer returned $retSx"
-    if [ "$rfcState" == "REDO" ] || [ "$rfcState" == "REDO_WITH_VALID_DATA" ]; then
+    if [ "$rfcState" == "REDO" ]; then
         # We have to abandon this data and start new request to redirect to new Xconf
         rm -f $RFC_WRITE_LOCK
     fi
@@ -1683,6 +1712,20 @@ if [ "$DEVICE_TYPE" != "broadband" ]; then
     fi
 fi
 
+firmwareVersion=$(getFWVersion)
+if [ -f $RFC_PATH/.version ]; then
+    lastFirmware=`cat $RFC_PATH/.version`
+else
+    lastFirmware=""
+fi
+
+if [ "$firmwareVersion" !=  "$lastFirmware" ]; then
+    if [ "$DEVICE_TYPE" = "hybrid" ] || [ "$DEVICE_TYPE" = "mediaclient" ]; then
+        newFirmwareFirstRequest="true"
+        rfcLogging "RFC: newFirmwareFirstRequest=$newFirmwareFirstRequest"
+    fi
+fi
+
 # Initialize RFC configuration state
 
 rfcSelectUrl="$RFC_CONFIG_SERVER_URL"
@@ -1700,8 +1743,8 @@ else
     rfcSelectOpt="prod"
 
     CallXconf
-        retSs=$?
-        rfcLogging "First call Returned $retSs"
+    retSs=$?
+    rfcLogging "First call Returned $retSs"
 fi
 #Check the Xconf url to be used based on Xconf selector.
 

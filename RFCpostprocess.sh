@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/busybox sh
 ##########################################################################
 # If not stated otherwise in this file or this component's Licenses.txt
 # file the following copyright and licenses apply:
@@ -66,8 +66,8 @@ else
     if [ "$DEVICE_TYPE" != "XHC1" ]; then
         # Insert the Dynamic White List Servers
         if [ -f $RDK_PATH/iptables_init ]; then
-            sh $RDK_PATH/iptables_init SSH_Refresh &
-            sh $RDK_PATH/iptables_init SNMP_Refresh &
+            /bin/busybox sh $RDK_PATH/iptables_init SSH_Refresh &
+            /bin/busybox sh $RDK_PATH/iptables_init SNMP_Refresh &
         fi
     fi
 fi

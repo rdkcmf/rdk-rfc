@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/busybox sh
 ##########################################################################
 # If not stated otherwise in this file or this component's Licenses.txt
 # file the following copyright and licenses apply:
@@ -1800,7 +1800,7 @@ fi
 
 # Finish the IP Firewall Configuration
 if [ -f $RDK_PATH/iptables_init ]; then
-    sh $RDK_PATH/iptables_init Finish &
+    /bin/busybox sh $RDK_PATH/iptables_init Finish &
     rfcLogging "Finish the IP Firewall Configuration"
 fi
 

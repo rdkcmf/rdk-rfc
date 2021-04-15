@@ -146,8 +146,6 @@ export PATH=$PATH:/usr/bin:/bin:/usr/local/bin:/sbin:/usr/local/lighttpd/sbin:/u
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/Qt/lib:/usr/local/lib
 RFCFLAG="/tmp/.RFCSettingsFlag"
 
-
-
 #---------------------------------
 # Initialize Variables
 #---------------------------------
@@ -220,6 +218,10 @@ fi
 UseCodebig=0
 CodebigAvailable=0
 RfcRebootCronNeeded=0
+
+if [ "$DEVICE_TYPE" = "XHC1" ]; then
+    RDKC_ACCOUNT_ID="Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AccountInfo.AccountID"
+fi
 
 #---------------------------------
 # Function declarations
@@ -760,7 +762,11 @@ processJsonResponseV()
                                 if [ "$DEVICE_TYPE" = "XHC1" ]; then
                                     if [ "$paramValue" != "$configValue" ]; then
                                         if [ $RebootValue_xhc1 -eq 1 ]; then
-                                            if [ -n "$RfcRebootCronNeeded" ]; then
+                                            if [ "x$RDKC_ACCOUNT_ID" = "x$paramName" ]; then
+                                                # Before firmware Upgrade the Account Id will be invalidated.
+                                                # For all cases we skip scheduling RFC reboot for account id value change
+                                                rfcLogging "RFC: Skip scheduling RFC reboot for Account Id value change"
+                                            elif [ -n "$RfcRebootCronNeeded" ]; then
                                                 RfcRebootCronNeeded=1;
                                                 rfcLogging "RFC: Enabling RfcRebootCronNeeded since $paramName old value=$paramValue, new value=$configValue, Immediate reboot=$RebootValue_xhc1"
                                             fi

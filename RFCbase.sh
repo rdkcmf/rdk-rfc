@@ -141,6 +141,21 @@ RFC_TMP_PATH="$RFC_RAM_PATH/tmp"
 if [ ! -d $RFC_TMP_PATH ]; then
     mkdir -p $RFC_TMP_PATH
 fi
+
+IARM_EVENT_BINARY_LOCATION=/usr/bin
+if [ ! -f /etc/os-release ]; then
+    IARM_EVENT_BINARY_LOCATION=/usr/local/bin
+fi
+
+eventSender()
+{
+    if [ -f $IARM_EVENT_BINARY_LOCATION/IARM_event_sender ];
+    then
+        $IARM_EVENT_BINARY_LOCATION/IARM_event_sender $1 $2
+    fi
+}
+
+
 WAREHOUSE_ENV="$RAMDISK_PATH/warehouse_mode_active"
 export PATH=$PATH:/usr/bin:/bin:/usr/local/bin:/sbin:/usr/local/lighttpd/sbin:/usr/local/sbin
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/Qt/lib:/usr/local/lib
@@ -218,6 +233,7 @@ fi
 UseCodebig=0
 CodebigAvailable=0
 RfcRebootCronNeeded=0
+RebootRequired=0
 
 if [ "$DEVICE_TYPE" = "XHC1" ]; then
     RDKC_ACCOUNT_ID="Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AccountInfo.AccountID"
@@ -811,6 +827,15 @@ processJsonResponseV()
                                     rfcLogging "$value8"
                                     $RFC_SET -v $configValue  $paramName >> $RFC_LOG_FILE
                                     rfcLogging "RFC:  updated for $paramName from value old=$paramValue, to new=$configValue"
+                                    if [ "$paramValue" != "$configValue" ]; then
+                                        if [ "$DEVICE_TYPE" != "broadband" ] && [ "x$ENABLE_MAINTENANCE" == "xtrue" ]
+                                        then
+                                           rfcLogging "RFC: Posting Critical update - on finding change in RFC parameters"
+                                           MAINT_CRITICAL_UPDATE=11
+                                           eventSender "MaintenanceMGR" $MAINT_CRITICAL_UPDATE
+                                           RebootRequired=1
+                                        fi
+                                    fi
                                 else
                                         $RFC_SET $paramName=$configValue >> $RFC_LOG_FILE
                                         rfcLogging "RFC:  updated for $paramName from value old=$paramValue, to new=$configValue"
@@ -1175,7 +1200,7 @@ sendHttpRequestToServer()
     http_code=$(awk -F\" '{print $1}' $HTTP_CODE)
     retSs=$?
     rfcLogging "TLSRet = $TLSRet http_code: $http_code"
-
+    maintenance_error_flag=0;
 
     if [ $TLSRet = 0 ] && [ "$http_code" = "404" ]; then
         rfcLogging "Received HTTP 404 Response from Xconf Server. Retry logic not needed"
@@ -1184,6 +1209,7 @@ sendHttpRequestToServer()
         rm -rf $RFC_TMP_PATH
         rm -f $VARIABLEFILE
         rfcLogging "[Features Enabled]-[NONE]: "
+        maintenance_error_flag=1
 
     # Now delete write lock, if set
         rm -f $RFC_WRITE_LOCK
@@ -1204,6 +1230,7 @@ sendHttpRequestToServer()
     elif [ $retSs -ne 0 -o "$http_code" != "200" ] ; then   # check for retSs is probably superfluous
         rfcLogging "HTTP request failed"
         resp=1
+        maintenance_error_flag=1
     else
         rfcLogging "HTTP request success. Processing response.."
 
@@ -1254,6 +1281,18 @@ sendHttpRequestToServer()
         rfcSet ${XCONF_SELECTOR_TR181_NAME} string "$rfcSelectOpt" >> $RFC_LOG_FILE
         rfcSet ${XCONF_URL_TR181_NAME} string "$rfcSelectUrl" >> $RFC_LOG_FILE
 
+    fi
+
+    if [ "$DEVICE_TYPE" != "broadband" ] && [ "x$ENABLE_MAINTENANCE" == "xtrue" ]
+    then
+        if [ "$maintenance_error_flag" -eq 1 ]
+        then
+            MAINT_RFC_ERROR=3
+            eventSender "MaintenanceMGR" $MAINT_RFC_ERROR
+        else
+            MAINT_RFC_COMPLETE=2
+            eventSender "MaintenanceMGR" $MAINT_RFC_COMPLETE
+        fi
     fi
     rfcLogging "resp = $resp"
 
@@ -1763,6 +1802,21 @@ fi
 if [ -f $RDK_PATH/iptables_init ]; then
     sh $RDK_PATH/iptables_init Finish &
     rfcLogging "Finish the IP Firewall Configuration"
+fi
+
+if [ "x$ENABLE_MAINTENANCE" == "xtrue" ]
+then
+# Now delete service lock
+   rfcLogging "RFC: Completed service, deleting lock "
+   rm -f $RFC_SERVICE_LOCK
+
+   if [ "$RebootRequired" = "1" ]; then
+      rfcLogging "RFC: Posting Reboot Required Event"
+      MAINT_REBOOT_REQUIRED=12
+      eventSender "MaintenanceMGR" $MAINT_REBOOT_REQUIRED
+   fi
+
+   exit 0
 fi
 
 rfcLogging "START CONFIGURING RFC CRON"

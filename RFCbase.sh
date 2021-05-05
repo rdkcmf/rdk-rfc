@@ -769,6 +769,7 @@ processJsonResponseV()
                                 elif [ "$DEVICE_TYPE" = "XHC1" ]; then
                                     $RFC_GET $paramName  > /tmp/.paramRFC
                                     paramValue=`grep "$paramName =" /tmp/.paramRFC | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | cut -d' ' -f3`
+                                    isGetSuccessful=`grep "$paramName =" /tmp/.paramRFC | wc -l`
                                 fi
 
                                 enable_Check=`echo "$paramName" | grep -ci '.X_RDKCENTRAL-COM_RFC.'`
@@ -794,8 +795,10 @@ processJsonResponseV()
                                                 # For all cases we skip scheduling RFC reboot for account id value change
                                                 rfcLogging "RFC: Skip scheduling RFC reboot for Account Id value change"
                                             elif [ -n "$RfcRebootCronNeeded" ]; then
-                                                RfcRebootCronNeeded=1;
-                                                rfcLogging "RFC: Enabling RfcRebootCronNeeded since $paramName old value=$paramValue, new value=$configValue, Immediate reboot=$RebootValue_xhc1"
+                                                if [ $isGetSuccessful -ne 0 ]; then
+                                                    RfcRebootCronNeeded=1;
+                                                    rfcLogging "RFC: Enabling RfcRebootCronNeeded since $paramName old value=$paramValue, new value=$configValue, Immediate reboot=$RebootValue_xhc1"
+                                                fi
                                             fi
                                         fi
                                     fi

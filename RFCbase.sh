@@ -235,6 +235,13 @@ CodebigAvailable=0
 RfcRebootCronNeeded=0
 RebootRequired=0
 
+
+if [ -f /usr/bin/rdkssacli ] && [ -f /opt/certs/devicecert_1.pk12 ]; then
+    useXpkiMtlsLogupload="true"
+else
+    useXpkiMtlsLogupload="false"
+fi
+
 if [ "$DEVICE_TYPE" = "XHC1" ]; then
     RDKC_ACCOUNT_ID="Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AccountInfo.AccountID"
 fi
@@ -1142,7 +1149,7 @@ sendHttpRequestToServer()
         CB_SIGNED_REQUEST=`cat /tmp/.signedRequest`
         rm -f /tmp/.signedRequest
         if [ -f $EnableOCSPStapling ] || [ -f $EnableOCSP ]; then
-            CURL_CMD="curl -w '%{http_code}\n'  -D "/tmp/curl_header"  "$IF_FLAG" --cert-status --connect-timeout $timeout -m $timeout "$TLSFLAG" -H "configsethash:$valueHash" -H "configsettime:$valueTime" -o  \"$FILENAME\" \"$CB_SIGNED_REQUEST\""
+            CURL_CMD="curl -w '%{http_code}\n'  -D "/tmp/curl_header"  "$IF_FLAG" --cert-status --connect-timeout $timeout -m $timeout "$TLSFLAG" -H "configsethash:$valueHash" -H "configsettime:$valueTime" -o  \"$FILENAME\" \"$CB_SIGNED_REQUEST\"" 
         else
             CURL_CMD="curl -w '%{http_code}\n'  -D "/tmp/curl_header"  "$IF_FLAG" --connect-timeout $timeout -m $timeout "$TLSFLAG" -H "configsethash:$valueHash" -H "configsettime:$valueTime" -o  \"$FILENAME\" \"$CB_SIGNED_REQUEST\""
         fi
@@ -1151,35 +1158,44 @@ sendHttpRequestToServer()
     else
         if [ "$mTLS_RPI" == "true" ] ; then
             CURL_CMD="curl --cert-type pem --cert /etc/ssl/certs/refplat-xconf-cpe-clnt.xcal.tv.cert.pem --key /tmp/xconf-file.tmp -w '%{http_code}\n'  -D "/tmp/curl_header"  "$IF_FLAG" --connect-timeout $timeout -m $timeout "$TLSFLAG" -H "configsethash:$valueHash" -H "configsettime:$valueTime" -o  \"$FILENAME\" '$URL$JSONSTR'"
-        elif [ "$mTlsEnable" == "true" ]; then
-            echo "RFC requires Mutual Authentication" >> $RFC_LOG_FILE
-            if [ -d /etc/ssl/certs ]; then
-                if [ ! -f /usr/bin/GetConfigFile ];then
-                    echo "Error: GetConfigFile Not Found" >> $RFC_LOG_FILE
-                    resp=1
-                    return $resp
-                fi
-                ID="/tmp/uydrgopwxyem"
-                GetConfigFile $ID
-            fi
-            CURL_CMD="curl --key /tmp/uydrgopwxyem --cert /etc/ssl/certs/cpe-clnt.xcal.tv.cert.pem -w '%{http_code}\n'  -D "/tmp/curl_header" "$IF_FLAG" --connect-timeout $timeout -m $timeout "$TLSFLAG"  -H "configsethash:$valueHash" -H "configsettime:$valueTime" -o  \"$FILENAME\" '$URL$JSONSTR'"
         else
-            CURL_CMD="curl -w '%{http_code}\n'  -D "/tmp/curl_header" "$IF_FLAG" --connect-timeout $timeout -m $timeout "$TLSFLAG"  -H "configsethash:$valueHash" -H "configsettime:$valueTime" -o  \"$FILENAME\" '$URL$JSONSTR'"
+            if [ $useXpkiMtlsLogupload == "true" ]; then
+                echo "RFC requires Mutual Authentication" >> $RFC_LOG_FILE
+                CURL_CMD="curl --cert-type P12 --cert /opt/certs/devicecert_1.pk12:$(/usr/bin/rdkssacli "{STOR=GET,SRC=kquhqtoczcbx,DST=/dev/stdout}") -w '%{http_code}\n'  -D "/tmp/curl_header" "$IF_FLAG" --connect-timeout $timeout -m $timeout "$TLSFLAG"  -H "configsethash:$valueHash" -H "configsettime:$valueTime" -o  \"$FILENAME\" '$URL$JSONSTR'"
+            elif [ -f /etc/ssl/certs/staticXpkiCrt.pk12 ] && [ -f /usr/bin/GetConfigFile ]; then
+                ID="/tmp/.cfgStaticxpki"
+                if [ ! -f "$ID" ]; then
+                    GetConfigFile $ID
+                fi
+                if [ ! -f "$ID" ]; then
+                    echo "Error: Getconfig file failed"
+                fi
+                CURL_CMD="curl  --cert-type P12 --cert /etc/ssl/certs/staticXpkiCrt.pk12:$(cat $ID) -w '%{http_code}\n'  -D "/tmp/curl_header" "$IF_FLAG" --connect-timeout $timeout -m $timeout "$TLSFLAG"  -H "configsethash:$valueHash" -H "configsettime:$valueTime" -o  \"$FILENAME\" '$URL$JSONSTR'"
+            else
+                CURL_CMD="curl -w '%{http_code}\n'  -D "/tmp/curl_header" "$IF_FLAG" --connect-timeout $timeout -m $timeout "$TLSFLAG"  -H "configsethash:$valueHash" -H "configsettime:$valueTime" -o  \"$FILENAME\" '$URL$JSONSTR'"
+            fi    
         fi
 
         if [ -f $EnableOCSPStapling ] || [ -f $EnableOCSP ]; then
             CURL_CMD="$CURL_CMD --cert-status"
         fi
 
-        rfcLogging "CURL_CMD: $CURL_CMD"
+        CURL_CMD_LOG=$CURL_CMD
     fi
+
+    # remove configsethash value from log
+    CURL_CMD_LOG=`echo "$CURL_CMD_LOG" | sed -e 's#configsethash:[^[:space:]]\+#configsethash:#g'`
+    # remove configsettime value from log
+    CURL_CMD_LOG=`echo "$CURL_CMD_LOG" | sed -e 's#configsettime:[^[:space:]]\+#configsettime:#g'`
+    CURL_CMD_LOG=`echo "$CURL_CMD_LOG" | sed 's/devicecert_1.*-w/devicecert_1.pk12<hidden key>/' | sed 's/staticXpkiCr.*-w/staticXpkiCrt.pk12<hidden key>/'`
+    rfcLogging "CURL_CMD: $CURL_CMD_LOG"
 
     # Execute curl command
     result= eval $CURL_CMD > $HTTP_CODE
     TLSRet=$?
 
-    if [ -f /tmp/uydrgopwxyem ];then
-        rm -rf /tmp/uydrgopwxyem
+    if [ -f /tmp/.cfgStaticxpki ];then
+        echo "MTLS enabled" >> $RFC_LOG_FILE
     else
         echo "MTLS not enabled" >> $RFC_LOG_FILE
     fi

@@ -1344,7 +1344,11 @@ waitForIpAcquisition()
     counter=0
     while [ $loop -eq 1 ]
     do
-        estbIp=`getIPAddress`
+	if [ "$DEVICE_TYPE" = "broadband" ]; then
+		estbIp=`getErouterIPAddress`
+	else
+		estbIp=`getIPAddress`
+	fi
         if [ "X$estbIp" == "X" ]; then
             sleep 10
         else

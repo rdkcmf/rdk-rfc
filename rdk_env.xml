@@ -2,6 +2,7 @@
   <components>
     <rfc>
       <dependencies>sdk,cjson,rdklogger,sysint</dependencies>
+      <is_coverity_supported>True</is_coverity_supported>
     </rfc>
   </components>
 </environment>

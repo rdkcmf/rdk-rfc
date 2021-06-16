@@ -106,7 +106,8 @@ tr181ErrorCode_t getParam(char *pcCallerID, const char* pcParameterName, TR181_P
    if (wdmpStatus == WDMP_SUCCESS || wdmpStatus == WDMP_ERR_DEFAULT_VALUE)
    {
       pstParamData->type = getType(param.type);
-      strcpy(pstParamData->value, param.value);
+      strncpy(pstParamData->value, param.value, MAX_PARAM_LEN);
+      pstParamData->value[MAX_PARAM_LEN - 1] = '\0';
       return tr181Success;
    }
 
@@ -198,8 +199,8 @@ tr181ErrorCode_t getValue(const char* fileName, const char* pcParameterName, TR1
                    {
                       pstParam->type = TR181_NONE; //The caller must know what type they are expecting
 
-                      strncpy(pstParam->value, value.c_str(), strlen(value.c_str()));
-                      pstParam->value[strlen(value.c_str())] = '\0';
+                      strncpy(pstParam->value, value.c_str(), MAX_PARAM_LEN);
+                      pstParam->value[MAX_PARAM_LEN - 1] = '\0';
                       return tr181Success;
                    }
                    return tr181ValueIsEmpty;

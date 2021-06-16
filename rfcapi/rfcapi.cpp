@@ -120,13 +120,13 @@ WDMP_STATUS getValue(const char* fileName, const char* pcParameterName, RFC_Para
                    RDK_LOG(RDK_LOG_DEBUG, LOG_RFCAPI, "Found Key = %s : Value = %s\n", key.c_str(), value.c_str());
                    if(value.length() > 0)
                    {
-                      strncpy(pstParam->name, pcParameterName, strlen(pcParameterName));
-                      pstParam->name[strlen(pcParameterName)] = '\0';
+                      strncpy(pstParam->name, pcParameterName, MAX_PARAM_LEN);
+                      pstParam->name[MAX_PARAM_LEN - 1] = '\0';
 
                       pstParam->type = WDMP_NONE; //The caller must know what type they are expecting if they are requesting a param before the hostif is ready.
 
-                      strncpy(pstParam->value, value.c_str(), strlen(value.c_str()));
-                      pstParam->value[strlen(value.c_str())] = '\0';
+                      strncpy(pstParam->value, value.c_str(), MAX_PARAM_LEN);
+                      pstParam->value[MAX_PARAM_LEN - 1] = '\0';
                       return WDMP_SUCCESS;
                    }
                    return WDMP_ERR_VALUE_IS_EMPTY;
@@ -181,12 +181,12 @@ int getValue(const char* fileName, const char* pcParameterName, RFC_ParamData_t 
                    RDK_LOG(RDK_LOG_DEBUG, LOG_RFCAPI, "Found Key = %s : Value = %s\n", key.c_str(), value.c_str());
                    if(value.length() > 0)
                    {
-                      strncpy(pstParam->name, pcParameterName, strlen(pcParameterName));
-                      pstParam->name[strlen(pcParameterName)] = '\0';
+                      strncpy(pstParam->name, pcParameterName, MAX_PARAM_LEN);
+                      pstParam->name[MAX_PARAM_LEN - 1] = '\0';
                       pstParam->type = NONE; //The caller must know what type they are expecting if they are requesting a param before the hostif is ready.
 
-                      strncpy(pstParam->value, value.c_str(), strlen(value.c_str()));
-                      pstParam->value[strlen(value.c_str())] = '\0';
+                      strncpy(pstParam->value, value.c_str(), MAX_PARAM_LEN);
+                      pstParam->value[MAX_PARAM_LEN - 1] = '\0';
                       return SUCCESS;
                    }
                    return EMPTY;
@@ -350,8 +350,8 @@ WDMP_STATUS getRFCParameter(char *pcCallerID, const char* pcParameterName, RFC_P
             cJSON* name    = cJSON_GetObjectItem(subitem, "name");
             if(name)
             {
-               strncpy(pstParam->name, name->valuestring,strlen(name->valuestring));
-               pstParam->name[strlen(name->valuestring)] = '\0';
+               strncpy(pstParam->name, name->valuestring, MAX_PARAM_LEN);
+               pstParam->name[MAX_PARAM_LEN - 1] = '\0';
 #ifdef TEMP_LOGGING
                logofs << prefix() << "name = " << pstParam->name << endl;
 #endif
@@ -370,8 +370,8 @@ WDMP_STATUS getRFCParameter(char *pcCallerID, const char* pcParameterName, RFC_P
             cJSON* value = cJSON_GetObjectItem(subitem, "value");
             if (value)
             {
-               strncpy(pstParam->value, value->valuestring,strlen(value->valuestring));
-               pstParam->value[strlen(value->valuestring)] = '\0';
+               strncpy(pstParam->value, value->valuestring, MAX_PARAM_LEN);
+               pstParam->value[MAX_PARAM_LEN - 1] = '\0';
 #ifdef TEMP_LOGGING
                logofs << prefix() << "value = " << pstParam->value << endl;
 #endif

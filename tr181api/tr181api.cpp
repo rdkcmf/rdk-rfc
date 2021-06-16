@@ -27,11 +27,38 @@
 #include <unordered_map>
 
 #define TR181_CLEAR_PARAM "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.ClearParam"
-#define TR181_LOCAL_STORE_FILE "/opt/secure/RFC/tr181localstore.ini"
+
+#ifdef ENABLE_LLAMA_PLATCO
+   #define TR181_LOCAL_STORE_FILE "/opt/persistent/tr181localstore.ini"
+#else
+   #define TR181_LOCAL_STORE_FILE "/opt/secure/RFC/tr181localstore.ini"
+#endif
+
 #define RFCDEFAULTS_ETC_DIR "/etc/rfcdefaults/"
 #define LOG_TR181API  "LOG.RDK.TR181API"
 using namespace std;
 const char *semName = "localstore";
+
+#ifdef TR181API_LOGGING
+static ofstream logofs;
+
+static void openLogFile()
+{
+   if (!logofs.is_open())
+      logofs.open("/opt/secure/RFC/tr181api.log", ios_base::app);
+}
+
+static string prefix()
+{
+    time_t timer;
+    char buffer[50];
+    struct tm* tm_info;
+    time(&timer);
+    tm_info = localtime(&timer);
+    strftime(buffer, 50, "rfcapi:%Y-%m-%d %H:%M:%S ", tm_info);
+    return string(buffer);
+}
+#endif
 
 TR181_PARAM_TYPE getType(DATA_TYPE type)
 {
@@ -203,6 +230,15 @@ tr181ErrorCode_t setValue(const char* pcParameterName, const char* pcParamValue)
 
     std::unordered_map<std::string, std::string> m_dict;
 
+#ifdef TR181API_LOGGING
+   openLogFile();
+
+    logofs << prefix() << "paramName=" << key << " value=" << value << "\n";
+    std::ifstream f1(TR181_LOCAL_STORE_FILE);
+    if (f1.is_open())
+        logofs << prefix() << "file content before write:\n" << f1.rdbuf();
+#endif
+
     ifstream ifs_tr181(TR181_LOCAL_STORE_FILE);
     if (!ifs_tr181.is_open()) {
         RDK_LOG (RDK_LOG_INFO, LOG_TR181API, "%s: Trying to open a non-existent file [%s] \n", __FUNCTION__, TR181_LOCAL_STORE_FILE);
@@ -263,6 +299,16 @@ tr181ErrorCode_t setValue(const char* pcParameterName, const char* pcParamValue)
     }
     ofs.flush();
     ofs.close();
+
+#ifdef TR181API_LOGGING
+    std::ifstream f2(TR181_LOCAL_STORE_FILE);
+    if (f2.is_open())
+        logofs << prefix() << "file content after write:\n" << f2.rdbuf()  << "\n";
+
+    logofs.flush();
+    logofs.close();
+#endif
+
     return tr181Success;
 }
 

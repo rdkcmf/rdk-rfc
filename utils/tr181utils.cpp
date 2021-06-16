@@ -109,6 +109,21 @@ static DATA_TYPE convertType(char type)
 */
 static int getAttribute(char * const paramName)
 {
+   if (id && !strncmp(id, "localOnly", 9)) {
+       TR181_ParamData_t param;
+       tr181ErrorCode_t status = getLocalParam(id, paramName, &param);
+       if(status == tr181Success)
+       {
+           cout << __FUNCTION__ << " >> Param Value :: " << param.value << endl;
+           cerr << param.value << endl;
+       }
+       else
+       {
+          cout << __FUNCTION__ << " >> Failed to retrieve : Reason " << getTR181ErrorString(status) << endl;
+       }
+       return status;
+    }
+
    RFC_ParamData_t param;
    WDMP_STATUS status = getRFCParameter(id, paramName, &param);
 
@@ -133,6 +148,19 @@ static int getAttribute(char * const paramName)
 */
 static int setAttribute(char * const paramName  ,char type, char * value)
 {
+   if (id && !strncmp(id, "localOnly", 9)) {
+      int status = setLocalParam(id, paramName, value);
+      if(status == 0)
+      {
+         cout << __FUNCTION__ << " >> Set Local Param success! " << endl;
+      }
+      else
+      {
+         cout << __FUNCTION__ << " >> Failed to Set Local Param." << endl;
+      }
+      return status;
+   }
+
    DATA_TYPE paramType;
    if (!getParamType (paramName, &paramType))
    {
@@ -156,7 +184,6 @@ static int setAttribute(char * const paramName  ,char type, char * value)
 */
 static int clearAttribute(char * const paramName)
 {
-   RFC_ParamData_t param;
    int status = clearParam(id, paramName);
 
    if(status == 0)

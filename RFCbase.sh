@@ -830,9 +830,6 @@ processJsonResponseV()
                                     if [ "$paramValue" != "$configValue" ]; then
                                         if [ "$DEVICE_TYPE" != "broadband" ] && [ "x$ENABLE_MAINTENANCE" == "xtrue" ]
                                         then
-                                           rfcLogging "RFC: Posting Critical update - on finding change in RFC parameters"
-                                           MAINT_CRITICAL_UPDATE=11
-                                           eventSender "MaintenanceMGR" $MAINT_CRITICAL_UPDATE
                                            RebootRequired=1
                                         fi
                                     fi
@@ -1283,17 +1280,6 @@ sendHttpRequestToServer()
 
     fi
 
-    if [ "$DEVICE_TYPE" != "broadband" ] && [ "x$ENABLE_MAINTENANCE" == "xtrue" ]
-    then
-        if [ "$maintenance_error_flag" -eq 1 ]
-        then
-            MAINT_RFC_ERROR=3
-            eventSender "MaintenanceMGR" $MAINT_RFC_ERROR
-        else
-            MAINT_RFC_COMPLETE=2
-            eventSender "MaintenanceMGR" $MAINT_RFC_COMPLETE
-        fi
-    fi
     rfcLogging "resp = $resp"
 
     if [ $resp = 0 ]; then
@@ -1729,6 +1715,11 @@ processJsonResponseB()
 
 # Check if RFC script is already locked. If yes, RFC processing is in progress, just exit from the shell
 if [ -f $RFC_SERVICE_LOCK ]; then
+    if [ "x$ENABLE_MAINTENANCE" == "xtrue" ]
+    then
+         MAINT_RFC_INPROGRESS=14
+         eventSender "MaintenanceMGR" $MAINT_RFC_INPROGRESS
+    fi    
     rfcLogging "RFC: Service in progress. New instance not allowed. Lock file $RFC_SERVICE_LOCK is locked!"
     exit 1
 fi
@@ -1814,9 +1805,25 @@ then
    rfcLogging "RFC: Completed service, deleting lock "
    rm -f $RFC_SERVICE_LOCK
 
+   #Posting ERROR / COMPLETE here to avoid posting it multiple times in the retries
+   if [ "$maintenance_error_flag" -eq 1 ]
+   then
+       MAINT_RFC_ERROR=3
+       eventSender "MaintenanceMGR" $MAINT_RFC_ERROR
+   else
+       MAINT_RFC_COMPLETE=2
+      eventSender "MaintenanceMGR" $MAINT_RFC_COMPLETE
+   fi
+
    if [ "$RebootRequired" = "1" ]; then
+      #RebootRequired flag is set , this means it is a critical update
+      rfcLogging "RFC: Posting Critical update - on finding change in RFC parameters"
+      MAINT_CRITICAL_UPDATE=11
+      eventSender "MaintenanceMGR" $MAINT_CRITICAL_UPDATE
+    
+
       rfcLogging "RFC: Posting Reboot Required Event"
-      MAINT_REBOOT_REQUIRED=12
+      MAINT_REBOOT_REQUIRED=12 
       eventSender "MaintenanceMGR" $MAINT_REBOOT_REQUIRED
    fi
 

@@ -22,6 +22,7 @@
 #include "rfcapi.h"
 #include "semaphore.h"
 #include <fcntl.h>
+#include <unistd.h>
 #include "rdk_debug.h"
 #include <fstream>
 #include <unordered_map>
@@ -286,9 +287,8 @@ tr181ErrorCode_t setValue(const char* pcParameterName, const char* pcParamValue)
         m_dict[key] = value;
     }
 
-    ofstream ofs(TR181_LOCAL_STORE_FILE, ios::trunc | ios::out);
-
-    if(!ofs.is_open())
+    FILE *f = fopen(TR181_LOCAL_STORE_FILE, "w");
+    if (f == NULL)
     {
         RDK_LOG (RDK_LOG_ERROR, LOG_TR181API, "Failed to open : %s \n", TR181_LOCAL_STORE_FILE);
         return tr181Failure;
@@ -296,10 +296,11 @@ tr181ErrorCode_t setValue(const char* pcParameterName, const char* pcParamValue)
 
     for (unordered_map<string, string>::iterator it=m_dict.begin(); it!=m_dict.end(); ++it)
     {
-        ofs << it->first << '=' << it->second << endl;
+        fprintf(f, "%s=%s\n", it->first.c_str(), it->second.c_str());
     }
-    ofs.flush();
-    ofs.close();
+    fflush(f);
+    fsync(fileno(f));
+    fclose(f);
 
 #ifdef TR181API_LOGGING
     std::ifstream f2(TR181_LOCAL_STORE_FILE);

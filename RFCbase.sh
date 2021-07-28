@@ -209,6 +209,8 @@ DIRECT_BLOCK_FILENAME="/tmp/.lastdirectfail_rfc"
 CB_BLOCK_FILENAME="/tmp/.lastcodebigfail_rfc"
 FORCE_DIRECT_ONCE="/tmp/.forcedirectonce_rfc"
 
+RFC_SYNC_DONE="/tmp/.rfcSyncDone"
+
 default_IP=$DEFAULT_IP
 
 # store the working copy to VARFILE
@@ -936,6 +938,7 @@ rfcSetHashAndTime ()
     valueTime="$(date +%s )"
 
     rfcSetHTValue $valueHash  $valueTime
+    touch $RFC_SYNC_DONE
 }
 
 rfcClearHashAndTime ()
@@ -1738,11 +1741,6 @@ interrupt_rfc_onabort()
 
     rm -rf  $RFC_SERVICE_LOCK
 
-    #kill the sleep PID
-    if [ -v sleep_pid ]; then
-       kill "$sleep_pid"
-    fi
-
     sh /lib/rdk/maintenanceTrapEventNotifier.sh 1 &
 
    trap - SIGABRT
@@ -1793,17 +1791,14 @@ if [ "$DEVICE_TYPE" != "broadband" ]; then
         rfcLogging "Waiting 5 minutes before attempting to query xconf"
         sleep  300
     else
-        rfcLogging "Waiting 2 minutes before attempting to query xconf"
-        if [ "x$ENABLE_MAINTENANCE" == "xtrue" ]; then
-              #run sleep in a background job
-              sleep 120 &
-              # store and remember the sleep's PID
-              sleep_pid="$!"
-              # wait here for the sleep to complete
-              wait
-        else
-              sleep 120
-        fi
+        while [ ! -f /tmp/route_available ]
+        do
+            rfcLogging "/tmp/route_available not present wait for $RFC_VIDEO_INITIAL_WAIT sec and check again.."
+            sleep $RFC_VIDEO_INITIAL_WAIT
+        done
+        # Wait for 5 more seconds to give enough time for DNS to be ready after route is available.
+        sleep 5
+        rfcLogging "/tmp/route_available is now present. Ready to send curl request."
     fi
 fi
 

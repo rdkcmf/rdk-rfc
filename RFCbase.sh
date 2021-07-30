@@ -1731,6 +1731,25 @@ processJsonResponseB()
         rfcLogging "binary dcmjsonparse is not present"
     fi
 }
+if [ "x$ENABLE_MAINTENANCE" == "xtrue" ]; then
+interrupt_rfc_onabort()
+{
+    echo "RFC is interrupted due to the maintenance abort" >> $RFC_LOG_FILE
+
+    rm -rf  $RFC_SERVICE_LOCK
+
+    #kill the sleep PID
+    if [ -v sleep_pid ]; then
+       kill "$sleep_pid"
+    fi
+
+    sh /lib/rdk/maintenanceTrapEventNotifier.sh 1 &
+
+   trap - SIGABRT
+
+    exit
+}
+fi
 ##############################################################################
 #---------------------------------
 #        Main App
@@ -1752,6 +1771,12 @@ fi
 echo 1 > $RFC_SERVICE_LOCK
 rfcLogging "RFC: Starting service, creating lock "
 
+if [ "x$ENABLE_MAINTENANCE" == "xtrue" ]; then
+    trap 'interrupt_rfc_onabort' SIGABRT
+fi
+
+
+
 rfcLogging "RFC: Waiting for IP Acquistion..."
 waitForIpAcquisition
 
@@ -1769,7 +1794,16 @@ if [ "$DEVICE_TYPE" != "broadband" ]; then
         sleep  300
     else
         rfcLogging "Waiting 2 minutes before attempting to query xconf"
-        sleep 120
+        if [ "x$ENABLE_MAINTENANCE" == "xtrue" ]; then
+              #run sleep in a background job
+              sleep 120 &
+              # store and remember the sleep's PID
+              sleep_pid="$!"
+              # wait here for the sleep to complete
+              wait
+        else
+              sleep 120
+        fi
     fi
 fi
 
@@ -1823,8 +1857,11 @@ if [ -f $RDK_PATH/iptables_init ]; then
     rfcLogging "Finish the IP Firewall Configuration"
 fi
 
+
 if [ "x$ENABLE_MAINTENANCE" == "xtrue" ]
 then
+    
+   trap - SIGABRT
 # Now delete service lock
    rfcLogging "RFC: Completed service, deleting lock "
    rm -f $RFC_SERVICE_LOCK

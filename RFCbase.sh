@@ -657,7 +657,9 @@ processJsonResponseV()
                         cp $FILENAME $OUTFILE
                 else
                 # Extract Whitelists
-                        cat $OUTFILE
+                        if [ -f $OUTFILE ]; then
+                            cat $OUTFILE
+                        fi
                         rfcLogging "Utility $RFC_WHITELIST_TOOL is processing $OUTFILE"
                         $RFC_WHITELIST_TOOL $OUTFILE
                         cp $RFC_PATH/$RFC_LIST_FILE_NAME_PREFIX*$RFC_LIST_FILE_NAME_SUFFIX $RFC_RAM_PATH/.
@@ -796,7 +798,9 @@ processJsonResponseV()
                                 fi
 
                                 enable_Check=`echo "$paramName" | grep -ci '.X_RDKCENTRAL-COM_RFC.'`
-                                is_Bootstrap=`grep -ci "$paramName" $BS_STORE_FILENAME`
+                                if [ -f $BS_STORE_FILENAME ]; then
+                                    is_Bootstrap=`grep -ci "$paramName" $BS_STORE_FILENAME`
+                                fi
                                 if [ $enable_Check -eq 0 ] && [ $is_Bootstrap -eq 0 ]; then
                                     # This is parameetr outside of RFC namespace and not a bootstrap so needs to be tested if it is same as already set value
                                     if [ "$paramValue" != "$configValue" ]; then
@@ -898,8 +902,12 @@ rfcGetHashAndTime ()
 {
     if [ "$DEVICE_TYPE" = "broadband" ] || [ "$DEVICE_TYPE" = "XHC1" ]; then
     # read from the file since there is no common database on bb
-        valueHash=`cat $RFC_RAM_PATH/.hashValue`
-        valueTime=`cat $RFC_RAM_PATH/.timeValue`
+        if [ -f $RFC_RAM_PATH/.hashValue ] ; then
+            valueHash=`cat $RFC_RAM_PATH/.hashValue`
+        fi
+        if [ -f $RFC_RAM_PATH/.timeValue ] ; then
+            valueTime=`cat $RFC_RAM_PATH/.timeValue`
+        fi
     else
         valueHash=`$RFC_GET Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Control.ConfigSetHash  2>&1 > /dev/null`
         valueTime=`$RFC_GET Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Control.ConfigSetTime  2>&1 > /dev/null`

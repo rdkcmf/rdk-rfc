@@ -20,4 +20,7 @@ if ENABLE_RDKC
 SUBDIRS = rfcapi
 else
 SUBDIRS = rfcapi tr181api utils
+if WITH_GTEST_SUPPORT
+SUBDIRS += test
+endif
 endif

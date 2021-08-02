@@ -131,7 +131,8 @@ function clean()
     do
         cd $dName
         if [ -f Makefile ]; then
-                make distclean
+                make distclean-am
+                make clean
         fi
         rm -f configure;
         rm -rf aclocal.m4 autom4te.cache config.log config.status libtool

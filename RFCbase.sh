@@ -238,11 +238,25 @@ RfcRebootCronNeeded=0
 RebootRequired=0
 
 
-if [ -f /usr/bin/rdkssacli ] && [ -f /opt/certs/devicecert_1.pk12 ]; then
-    useXpkiMtlsLogupload="true"
-else
-    useXpkiMtlsLogupload="false"
+if [ -f /usr/bin/rdkssacli ]; then
+    if [ "$DEVICE_TYPE" = "broadband" ]; then
+        if [ -f /nvram/certs/devicecert_1.pk12 ]; then
+            useXpkiMtlsLogupload="true"
+            CERT_PATH="/nvram/certs/devicecert_1.pk12"
+        else
+            useXpkiMtlsLogupload="false"
+        fi
+    else
+        if [ -f /opt/certs/devicecert_1.pk12 ]; then
+            useXpkiMtlsLogupload="true"
+            CERT_PATH="/opt/certs/devicecert_1.pk12"
+        else
+            useXpkiMtlsLogupload="false"
+        fi
+    fi
 fi
+
+
 
 if [ "$DEVICE_TYPE" = "XHC1" ]; then
     RDKC_ACCOUNT_ID="Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AccountInfo.AccountID"
@@ -269,6 +283,7 @@ IsDirectBlocked()
     fi
     return $directret
 }
+
 
 IsCodeBigBlocked()
 {
@@ -1172,7 +1187,8 @@ sendHttpRequestToServer()
         else
             if [ $useXpkiMtlsLogupload == "true" ]; then
                 echo "RFC requires Mutual Authentication" >> $RFC_LOG_FILE
-                CURL_CMD="curl --cert-type P12 --cert /opt/certs/devicecert_1.pk12:$(/usr/bin/rdkssacli "{STOR=GET,SRC=kquhqtoczcbx,DST=/dev/stdout}") -w '%{http_code}\n'  -D "/tmp/curl_header" "$IF_FLAG" --connect-timeout $timeout -m $timeout "$TLSFLAG"  -H "configsethash:$valueHash" -H "configsettime:$valueTime" -o  \"$FILENAME\" '$URL$JSONSTR'"
+                echo "XpkiMtlsBasedLogUpload true for RFC" >> $RFC_LOG_FILE
+                CURL_CMD="curl --cert-type P12 --cert $CERT_PATH:$(/usr/bin/rdkssacli "{STOR=GET,SRC=kquhqtoczcbx,DST=/dev/stdout}") -w '%{http_code}\n'  -D "/tmp/curl_header" "$IF_FLAG" --connect-timeout $timeout -m $timeout "$TLSFLAG"  -H "configsethash:$valueHash" -H "configsettime:$valueTime" -o  \"$FILENAME\" '$URL$JSONSTR'"
             elif [ -f /etc/ssl/certs/staticXpkiCrt.pk12 ] && [ -f /usr/bin/GetConfigFile ]; then
                 ID="/tmp/.cfgStaticxpki"
                 if [ ! -f "$ID" ]; then
@@ -1181,8 +1197,10 @@ sendHttpRequestToServer()
                 if [ ! -f "$ID" ]; then
                     echo "Error: Getconfig file failed"
                 fi
+                echo "StaticXpkiMtlsBasedLogUpload true for RFC" >> $RFC_LOG_FILE
                 CURL_CMD="curl  --cert-type P12 --cert /etc/ssl/certs/staticXpkiCrt.pk12:$(cat $ID) -w '%{http_code}\n'  -D "/tmp/curl_header" "$IF_FLAG" --connect-timeout $timeout -m $timeout "$TLSFLAG"  -H "configsethash:$valueHash" -H "configsettime:$valueTime" -o  \"$FILENAME\" '$URL$JSONSTR'"
             else
+                echo "no xpki used for RFC" >> $RFC_LOG_FILE
                 CURL_CMD="curl -w '%{http_code}\n'  -D "/tmp/curl_header" "$IF_FLAG" --connect-timeout $timeout -m $timeout "$TLSFLAG"  -H "configsethash:$valueHash" -H "configsettime:$valueTime" -o  \"$FILENAME\" '$URL$JSONSTR'"
             fi    
         fi

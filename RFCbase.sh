@@ -694,11 +694,13 @@ processJsonResponseV()
                         # this is required as sometime key value pairs will simply
                         # disappear from the config data, as mac is mostly removed
                         # to disable a feature rather than having different value
-                        echo "RFC: resetting all rfc values in backing store"  >> $RFC_LOG_FILE
-                        touch $TR181_STORE_FILENAME
-                        $RFC_SET -v true Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Control.ClearDB >> $RFC_LOG_FILE
-                        $RFC_SET -v true Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Bootstrap.Control.ClearDB >> $RFC_LOG_FILE
-                        $RFC_SET -v "$(date +%s )" Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Control.ConfigChangeTime >> $RFC_LOG_FILE
+                        if [ "$DEVICE_TYPE" != "XHC1" ]; then
+                            echo "RFC: resetting all rfc values in backing store"  >> $RFC_LOG_FILE
+                            touch $TR181_STORE_FILENAME
+                            $RFC_SET -v true Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Control.ClearDB >> $RFC_LOG_FILE
+                            $RFC_SET -v true Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Bootstrap.Control.ClearDB >> $RFC_LOG_FILE
+                            $RFC_SET -v "$(date +%s )" Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Control.ConfigChangeTime >> $RFC_LOG_FILE
+                        fi
 
                         # Now retrieve parameters that must persist
                         rfcStashRetrieveParams
@@ -850,18 +852,18 @@ processJsonResponseV()
 
                                 if [ $setConfigValue -ne 0 ]; then
                                     if [ "$DEVICE_TYPE" != "XHC1" ]; then
-                                    #RFC SET
-                                    value8="$RFC_SET -v $configValue  $paramName "
-                                    rfcLogging "$value8"
-                                    $RFC_SET -v $configValue  $paramName >> $RFC_LOG_FILE
-                                    rfcLogging "RFC:  updated for $paramName from value old=$paramValue, to new=$configValue"
-                                    if [ "$paramValue" != "$configValue" ]; then
-                                        if [ "$DEVICE_TYPE" != "broadband" ] && [ "x$ENABLE_MAINTENANCE" == "xtrue" ]
-                                        then
-                                           RebootRequired=1
+                                        #RFC SET
+                                        value8="$RFC_SET -v $configValue  $paramName "
+                                        rfcLogging "$value8"
+                                        $RFC_SET -v $configValue  $paramName >> $RFC_LOG_FILE
+                                        rfcLogging "RFC:  updated for $paramName from value old=$paramValue, to new=$configValue"
+                                        if [ "$paramValue" != "$configValue" ]; then
+                                            if [ "$DEVICE_TYPE" != "broadband" ] && [ "x$ENABLE_MAINTENANCE" == "xtrue" ]
+                                            then
+                                                RebootRequired=1
+                                            fi
                                         fi
-                                    fi
-                                else
+                                    else
                                         $RFC_SET $paramName=$configValue >> $RFC_LOG_FILE
                                         rfcLogging "RFC:  updated for $paramName from value old=$paramValue, to new=$configValue"
                                     fi
@@ -896,12 +898,12 @@ processJsonResponseV()
         rm -f $RFC_WRITE_LOCK
 
         if [ "$DEVICE_TYPE" != "XHC1" ]; then
-        # Close tr-181 parameter update
-        echo "RFC: Flush out tr181store.ini file"  >> $RFC_LOG_FILE
-        $RFC_SET -v true Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Control.ClearDBEnd >> $RFC_LOG_FILE
-        $RFC_SET -v true Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Bootstrap.Control.ClearDBEnd >> $RFC_LOG_FILE
-        # Reload video variables from modified initialization files.
-        $RFC_SET -v true "RFC_CONTROL_RELOADCACHE" >> $RFC_LOG_FILE
+            # Close tr-181 parameter update
+            echo "RFC: Flush out tr181store.ini file"  >> $RFC_LOG_FILE
+            $RFC_SET -v true Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Control.ClearDBEnd >> $RFC_LOG_FILE
+            $RFC_SET -v true Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Bootstrap.Control.ClearDBEnd >> $RFC_LOG_FILE
+            # Reload video variables from modified initialization files.
+            $RFC_SET -v true "RFC_CONTROL_RELOADCACHE" >> $RFC_LOG_FILE
         fi
 
         rfcVideoCheckAccoutId
@@ -1142,10 +1144,15 @@ sendHttpRequestToServer()
 
     if [ "$firmwareVersion" =  "$lastFirmware" ]; then
         if [ "$rfcState" == "INIT" ]; then
-            paramValue=`rfcGet ${XCONF_SELECTOR_TR181_NAME}`
-            if [ "$paramValue" != "prod" ]; then
-                valueHash="OVERRIDE_HASH"
-                valueTime="0"
+            if [ "$DEVICE_TYPE" != "XHC1" ]; then
+                paramValue=`rfcGet ${XCONF_SELECTOR_TR181_NAME}`
+                if [ "$paramValue" != "prod" ]; then
+                    valueHash="OVERRIDE_HASH"
+                    valueTime="0"
+                else
+                    # retrieve hash value for previous data set
+                    rfcGetHashAndTime
+                fi
             else
                 # retrieve hash value for previous data set
                 rfcGetHashAndTime
@@ -1276,8 +1283,8 @@ sendHttpRequestToServer()
     else
         rfcLogging "HTTP request success. Processing response.."
 
-                # Pre-process Json Response to check if new Xconf server needs to be contacted
-                preProcessJsonResponse
+        # Pre-process Json Response to check if new Xconf server needs to be contacted
+        preProcessJsonResponse
 
         stat=$?
         rfcLogging "preProcessJsonResponse returned $stat"
@@ -1298,7 +1305,7 @@ sendHttpRequestToServer()
         fi
 
 
-                # Process the JSON response
+        # Process the JSON response
         if [ "$DEVICE_TYPE" = "broadband" ]; then
             processJsonResponseB
             featureReport
@@ -1317,11 +1324,12 @@ sendHttpRequestToServer()
         rfcLogging "COMPLETED RFC PASS"
 
         # Now store configuration so that it could be used by other processes
-
         XconfEndpoint="$rfcSelectOpt"
-        rfcLogging "STORRING XCONF URL AND SLOT NAME"
-        rfcSet ${XCONF_SELECTOR_TR181_NAME} string "$rfcSelectOpt" >> $RFC_LOG_FILE
-        rfcSet ${XCONF_URL_TR181_NAME} string "$rfcSelectUrl" >> $RFC_LOG_FILE
+        if [ "$DEVICE_TYPE" != "XHC1" ]; then
+            rfcLogging "STORRING XCONF URL AND SLOT NAME"
+            rfcSet ${XCONF_SELECTOR_TR181_NAME} string "$rfcSelectOpt" >> $RFC_LOG_FILE
+            rfcSet ${XCONF_URL_TR181_NAME} string "$rfcSelectUrl" >> $RFC_LOG_FILE
+        fi
 
     fi
 

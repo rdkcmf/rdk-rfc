@@ -255,11 +255,8 @@ if [ -f /usr/bin/rdkssacli ]; then
         fi
     fi
 fi
-
-
-
-if [ "$DEVICE_TYPE" = "XHC1" ]; then
-    RDKC_ACCOUNT_ID="Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AccountInfo.AccountID"
+if [ "$DEVICE_TYPE" = "XHC1" ] || [ "$DEVICE_TYPE" = "mediaclient" ]; then
+    RDK_ACCOUNT_ID="Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AccountInfo.AccountID"
 fi
 
 #---------------------------------
@@ -836,7 +833,7 @@ processJsonResponseV()
                                 if [ "$DEVICE_TYPE" = "XHC1" ]; then
                                     if [ "$paramValue" != "$configValue" ]; then
                                         if [ $RebootValue_xhc1 -eq 1 ]; then
-                                            if [ "x$RDKC_ACCOUNT_ID" = "x$paramName" ]; then
+                                            if [ "x$RDK_ACCOUNT_ID" = "x$paramName" ]; then
                                                 # Before firmware Upgrade the Account Id will be invalidated.
                                                 # For all cases we skip scheduling RFC reboot for account id value change
                                                 rfcLogging "RFC: Skip scheduling RFC reboot for Account Id value change"
@@ -853,16 +850,40 @@ processJsonResponseV()
                                 if [ $setConfigValue -ne 0 ]; then
                                     if [ "$DEVICE_TYPE" != "XHC1" ]; then
                                         #RFC SET
-                                        value8="$RFC_SET -v $configValue  $paramName "
-                                        rfcLogging "$value8"
-                                        $RFC_SET -v $configValue  $paramName >> $RFC_LOG_FILE
-                                        rfcLogging "RFC:  updated for $paramName from value old=$paramValue, to new=$configValue"
-                                        if [ "$paramValue" != "$configValue" ]; then
-                                            if [ "$DEVICE_TYPE" != "broadband" ] && [ "x$ENABLE_MAINTENANCE" == "xtrue" ]
-                                            then
-                                                RebootRequired=1
+                                            if [ "$paramName" != "$RDK_ACCOUNT_ID" ]; then
+
+                                                if [ "$paramValue" != "$configValue" ]; then
+                                                    rfcLogging "RFC:  updated for $paramName from value old=$paramValue, to new=$configValue"
+                                                    if [ "$DEVICE_TYPE" != "broadband" ] && [ "x$ENABLE_MAINTENANCE" == "xtrue" ]
+                                                    then
+                                                       RebootRequired=1
+                                                    fi
+                                                else
+                                                    rfcLogging "RFC:  reapplied for $paramName the same value old=$paramValue, new=$configValue"
+                                                fi
+                                            else
+                                                # special handling for RDK_ACCOUNT_ID
+                                                if [ "$configValue" = "Unknown" ] || [ "$configValue" = "unknown" ]; then
+                                                    rfcLogging "RFC: AccountId ($configValue) is replaced with Authservice ($paramValue)"
+                                                    configValue=$paramValue
+                                                else
+                                                    rfcLogging "RFC:  updated for $paramName from value old=$paramValue, to new=$configValue"
+
+                                                    if [ "$paramValue" != "$configValue" ]; then
+                                                        if [ "$DEVICE_TYPE" != "broadband" ] && [ "x$ENABLE_MAINTENANCE" == "xtrue" ]
+                                                        then
+                                                           RebootRequired=1
+                                                        fi
+                                                    fi
+                                                fi
                                             fi
-                                        fi
+                                            if [ "$configValue" != "" ]; then
+                                                value8="$RFC_SET -v $configValue  $paramName "
+                                                rfcLogging "$value8"
+                                                $RFC_SET -v $configValue  $paramName >> $RFC_LOG_FILE
+                                            else
+                                                rfcLogging "RFC: !!! EMPTY value for $paramName is rejected."
+                                            fi
                                     else
                                         $RFC_SET $paramName=$configValue >> $RFC_LOG_FILE
                                         rfcLogging "RFC:  updated for $paramName from value old=$paramValue, to new=$configValue"

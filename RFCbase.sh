@@ -1404,13 +1404,24 @@ waitForIpAcquisition()
     counter=0
     while [ $loop -eq 1 ]
     do
-	if [ "$DEVICE_TYPE" = "broadband" ]; then
-		estbIp=`getErouterIPAddress`
-	else
-		estbIp=`getIPAddress`
-	fi
+        if [ "$DEVICE_TYPE" = "broadband" ]; then
+            estbIp=`getErouterIPAddress`
+        else
+            estbIp=`getIPAddress`
+        fi
+        # max try added as 30 sec for Maintenance Manager
+        if [ "x$ENABLE_MAINTENANCE" = "xtrue" ]; then
+            if [ $counter -eq 3 ]; then
+                # we post event saying RFC error and exit.
+                MAINT_RFC_ERROR=3
+                eventSender "MaintenanceMGR" $MAINT_RFC_ERROR
+                exit
+            fi
+        fi
+
         if [ "X$estbIp" == "X" ]; then
             sleep 10
+            counter=$((counter+1))
         else
             if [ "$IPV6_ENABLED" = "true" ]; then
                 if [ "Y$estbIp" != "Y$DEFAULT_IP" ] && [ -f $WAREHOUSE_ENV ]; then
@@ -1418,14 +1429,14 @@ waitForIpAcquisition()
                 elif [ ! -f /tmp/estb_ipv4 ] && [ ! -f /tmp/estb_ipv6 ]; then
                     sleep 10
                     rfcLogging "waiting for IP flag to be created"
-                    let counter++
+                    counter=$((counter+1))
                 elif [ "Y$estbIp" == "Y$DEFAULT_IP" ] && [ -f /tmp/estb_ipv6 ]; then
                     rfcLogging "waiting for IPv6 IP, estb_ipv6 flag is created"
-                    let counter++
+                    counter=$((counter+1))
                     sleep 10    
                 elif [ "Y$estbIp" == "Y$DEFAULT_IP" ] && [ -f /tmp/estb_ipv4 ]; then
                     rfcLogging "waiting for IPv6 IP, estb_ipv4 flag is created"
-                    let counter++
+                    counter=$((counter+1))
                     sleep 10
                 else
                     loop=0
@@ -1434,7 +1445,7 @@ waitForIpAcquisition()
                 if [ "Y$estbIp" == "Y$DEFAULT_IP" ]; then
                     rfcLogging "waiting for IPv4 IP"
                     sleep 10
-                    let counter++
+                    counter=$((counter+1))
                 else
                     loop=0
                 fi
@@ -1841,14 +1852,24 @@ if [ "$DEVICE_TYPE" != "broadband" ]; then
         rfcLogging "Waiting 5 minutes before attempting to query xconf"
         sleep  300
     else
+        route_counter=0
         while [ ! -f /tmp/route_available ]
         do
             rfcLogging "/tmp/route_available not present wait for $RFC_VIDEO_INITIAL_WAIT sec and check again.."
             sleep $RFC_VIDEO_INITIAL_WAIT
+            if [ "x$ENABLE_MAINTENANCE" = "xtrue" ];then
+                if [ $route_counter -eq 3 ];then
+                    # we post event saying RFC error and exit
+                    MAINT_RFC_ERROR=3
+                    eventSender "MaintenanceMGR" $MAINT_RFC_ERROR
+                    exit
+                fi
+            fi
+            route_counter=$((route_counter+1))
         done
         # Wait for 5 more seconds to give enough time for DNS to be ready after route is available.
         sleep 5
-        rfcLogging "/tmp/route_available is now present. Ready to send curl request."
+        rfcLogging "/tmp/route_available is now present. Count = $route_counter. Ready to send curl request."
     fi
 fi
 

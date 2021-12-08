@@ -257,6 +257,7 @@ if [ -f /usr/bin/rdkssacli ]; then
 fi
 if [ "$DEVICE_TYPE" = "XHC1" ] || [ "$DEVICE_TYPE" = "mediaclient" ]; then
     RDK_ACCOUNT_ID="Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AccountInfo.AccountID"
+    RDK_ACCOUNT_HASH="Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.MD5AccountHash"
 fi
 
 #---------------------------------
@@ -833,7 +834,7 @@ processJsonResponseV()
                                 if [ "$DEVICE_TYPE" = "XHC1" ]; then
                                     if [ "$paramValue" != "$configValue" ]; then
                                         if [ $RebootValue_xhc1 -eq 1 ]; then
-                                            if [ "x$RDK_ACCOUNT_ID" = "x$paramName" ]; then
+                                            if [ "x$RDK_ACCOUNT_ID" = "x$paramName" ] || [ "x$RDK_ACCOUNT_HASH" = "x$paramName" ]; then
                                                 # Before firmware Upgrade the Account Id will be invalidated.
                                                 # For all cases we skip scheduling RFC reboot for account id value change
                                                 rfcLogging "RFC: Skip scheduling RFC reboot for Account Id value change"
@@ -849,7 +850,7 @@ processJsonResponseV()
 
                                 if [ $setConfigValue -ne 0 ]; then
                                     if [ "$DEVICE_TYPE" != "XHC1" ]; then
-                                        #RFC SET
+                                            #RFC SET
                                             if [ "$paramName" != "$RDK_ACCOUNT_ID" ]; then
 
                                                 if [ "$paramValue" != "$configValue" ]; then

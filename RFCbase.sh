@@ -1802,7 +1802,7 @@ fi
 ##############################################################################
 
 # Check if RFC script is already locked. If yes, RFC processing is in progress, just exit from the shell
-if [ -f $RFC_SERVICE_LOCK ]; then
+if [ -e ${RFC_SERVICE_LOCK} ] && kill -0 `cat ${RFC_SERVICE_LOCK}`; then
     if [ "x$ENABLE_MAINTENANCE" == "xtrue" ]
     then
          MAINT_RFC_INPROGRESS=14
@@ -1812,8 +1812,11 @@ if [ -f $RFC_SERVICE_LOCK ]; then
     exit 1
 fi
 
+# make sure the lockfile is removed when we exit
+trap "rm -f ${RFC_SERVICE_LOCK}; exit 0" INT TERM EXIT
+
 # Now Lock the recursion for this script, to prevent multiple concurent RFC read requests
-echo 1 > $RFC_SERVICE_LOCK
+echo $$ > ${RFC_SERVICE_LOCK}
 rfcLogging "RFC: Starting service, creating lock "
 
 if [ "x$ENABLE_MAINTENANCE" == "xtrue" ]; then

@@ -1414,16 +1414,6 @@ sendHttpRequestToServer()
 
         echo $firmwareVersion > $RFC_PATH/.version
 
-        ## copy all RFC files to old non-secure location for backward compatibility with previous release
-        ##
-        if [ "$http_code" = "200" ]; then
-            rfcLogging "Updating RFC files to old location"
-            rm -r $OLD_RFC_BASE/RFC
-            cp -r $RFC_BASE/RFC $OLD_RFC_BASE
-        fi
-        ##
-        ## The block above to be removed after 2 releases (Q2/2019)
-
         # Execute postprocessing
         if [ -f "$RFC_POSTPROCESS" ]; then
             rfcLogging "Starting Post Processing"
@@ -1908,7 +1898,13 @@ if [ "x$ENABLE_MAINTENANCE" == "xtrue" ]; then
     trap 'interrupt_rfc_onabort' SIGABRT
 fi
 
-
+## check if old un-encrypted RFC location exist, and then remove it
+if [ "$DEVICE_TYPE" != "broadband" ]; then
+    if [ -d $OLD_RFC_BASE/RFC ]; then
+        rfcLogging "Removing old RFC location $OLD_RFC_BASE/RFC"
+        rm -r $OLD_RFC_BASE/RFC 
+    fi
+fi
 
 rfcLogging "RFC: Waiting for IP Acquistion..."
 waitForIpAcquisition

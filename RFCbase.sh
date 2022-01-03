@@ -258,6 +258,9 @@ fi
 if [ "$DEVICE_TYPE" = "XHC1" ] || [ "$DEVICE_TYPE" = "mediaclient" ]; then
     RDK_ACCOUNT_ID="Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AccountInfo.AccountID"
     RDK_ACCOUNT_HASH="Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.MD5AccountHash"
+    if [ "$DEVICE_TYPE" = "XHC1" ]; then
+        RDKC_DEVICE_PROVISION_STATUS=`checkCameraProvisionStatus`
+    fi
 fi
 
 #---------------------------------
@@ -757,7 +760,7 @@ processJsonResponseV()
 
                     if [ "$DEVICE_TYPE" = "XHC1" ]; then
                         # Here value6 gives the value for the key: effectiveImmediate
-                        if [ $value6 = "true" ]; then
+                        if [ $value6 = "true" ] && [ "$RDKC_DEVICE_PROVISION_STATUS" = "1" ]; then
                             RebootValue_xhc1=1
                             rfcLogging "RFC: Enabling Reboot flag for $varName"
                         else

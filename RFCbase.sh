@@ -1854,7 +1854,7 @@ fi
 if [ "$DEVICE_TYPE" != "broadband" ]; then
     if [ "$DEVICE_TYPE" = "XHC1" ]; then
         rfcLogging "Waiting 5 minutes before attempting to query xconf"
-        sleep  300
+        sleep  60
     else
         route_counter=0
         while [ ! -f /tmp/route_available ]

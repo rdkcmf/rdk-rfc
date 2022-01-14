@@ -22,7 +22,7 @@
 if [ -f /etc/device.properties ] ; then
         . /etc/device.properties
 fi
-
+DOWNLOAD_INPROGRESS="/tmp/.downloadingfw"
 if [ "$DEVICE_TYPE" = "XHC1" ]; then
         if [ -f /lib/rdk/utils.sh ]; then
                 . /lib/rdk/utils.sh
@@ -53,17 +53,27 @@ if [ "$DEVICE_TYPE" = "XHC1" ]; then
         fi
 
 elif [ "$DEVICE_TYPE" = "broadband" ]; then
+       if [ ! -f $DOWNLOAD_INPROGRESS ]
+    then
         source /usr/ccsp/tad/corrective_action.sh
 
         LOG_FILE="/rdklogs/logs/dcmrfc.log"
-
-        #Setting last reboot to rfc_reboot
-        echo_t "[RFC_Reboot.sh] setting last reboot to rfc_reboot" >> $LOG_FILE
-        setRebootreason rfc_reboot 1
+        RebootReason_log="/tmp/.RFCRebootReason"
+        #Setting last reboot to rfc_reboot"
+        if [ -f "$RebootReason_log" ]
+        then
+                RebootReason=`cat $RebootReason_log`
+                setRebootreason rfc_reboot 1
+                echo_t "[RFC_Reboot.sh] setting last reboot to $RebootReason" >> $LOG_FILE
+        else
+                echo_t "[RFC_Reboot.sh] setting last reboot to rfc_reboot" >> $LOG_FILE
+                setRebootreason rfc_reboot 1
+        fi
 
         #take log back up and reboot
 
         echo_t "[RFC_Reboot.sh] take log back up and reboot" >> $LOG_FILE
         sh /rdklogger/backupLogs.sh &
+     fi
 fi
 

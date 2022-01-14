@@ -39,11 +39,14 @@
 ##  "$DEVICE_TYPE" = "broadband"
 ##
 
+if [ "$DEVICE_TYPE" = "broadband" ]; then
+sysevent set RFC_Execution Started
+fi
+
 if [ -f /etc/waninfo.sh ]; then
     . /etc/waninfo.sh
     EROUTER_INTERFACE=$(getWanInterfaceName)
 fi
-
 T2_MSG_CLIENT=/usr/bin/telemetry2_0_client
 
 t2CountNotify() {
@@ -241,7 +244,8 @@ UseCodebig=0
 CodebigAvailable=0
 RfcRebootCronNeeded=0
 RebootRequired=0
-
+RebootReason="rfc_reboot_"
+sep=" :"
 
 if [ -f /usr/bin/rdkssacli ]; then
     if [ "$DEVICE_TYPE" = "broadband" ]; then
@@ -1733,6 +1737,7 @@ parseConfigValue()
                     if [ $RebootValue -eq 1 ]; then
                         if [ -n "$RfcRebootCronNeeded" ]; then
                             RfcRebootCronNeeded=1;
+                            RebootReason=$RebootReason$paramName$sep
                             rfcLogging "RFC: Enabling RfcRebootCronNeeded since $paramName old value=$paramValue, new value=$configValue, RebootValue=$RebootValue"
                         fi
                     fi
@@ -2073,9 +2078,10 @@ fi
 
 if [ "$RfcRebootCronNeeded" = "1" ]; then
     if [ "$DEVICE_TYPE" = "broadband" ] || [ "$DEVICE_TYPE" = "XHC1" ]; then
-        #Effectictive Reboot is required for the New RFC config. calling the script which will schedule cron to reboot in maintainance window
-        rfcLogging "RFC: RfcRebootCronNeeded=$RfcRebootCronNeeded. calling script to schedule reboot in maintence window "
-
+        #Effectictive Reboot is required for the New RFC config. calling the script which will schedule cron 
+        rfcLogging "RFC: RfcRebootCronNeeded=$RfcRebootCronNeeded. calling script to schedule reboot  "
+        rfcLogging "RFC: Rfc reboot is configured due to $RebootReason"
+        echo "$RebootReason" > "/tmp/.RFCRebootReason"
         if [ "$DEVICE_TYPE" = "broadband" ]; then
             sh /etc/RfcRebootCronschedule.sh &
         else
@@ -2084,4 +2090,8 @@ if [ "$RfcRebootCronNeeded" = "1" ]; then
             fi
         fi
     fi
+fi
+
+if [ "$DEVICE_TYPE" = "broadband" ]; then
+sysevent set RFC_Execution Completed
 fi

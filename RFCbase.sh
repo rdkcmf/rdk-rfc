@@ -1249,7 +1249,7 @@ sendHttpRequestToServer()
     # remove configsettime value from log
     CURL_CMD_LOG=`echo "$CURL_CMD_LOG" | sed -e 's#configsettime:[^[:space:]]\+#configsettime:#g'`
     CURL_CMD_LOG=`echo "$CURL_CMD_LOG" | sed 's/devicecert_1.*-w/devicecert_1.pk12<hidden key>/' | sed 's/staticXpkiCr.*-w/staticXpkiCrt.pk12<hidden key>/'`
-    rfcLogging "CURL_CMD: $CURL_CMD_LOG"
+    rfcLogging "RFC_TM_Track : CURL_CMD: $CURL_CMD_LOG"
 
     # Execute curl command
     result= eval $CURL_CMD > $HTTP_CODE
@@ -1273,7 +1273,9 @@ sendHttpRequestToServer()
     # Get the http_code
     http_code=$(awk -F\" '{print $1}' $HTTP_CODE)
     retSs=$?
-    rfcLogging "TLSRet = $TLSRet http_code: $http_code"
+    rfcLogging "RFC_TM_Track : TLSRet = $TLSRet http_code: $http_code"
+    up_time=$(uptime)
+    rfcLogging "RFC_TM_Track : uptime = $up_time"
     maintenance_error_flag=0;
 
     if [ $TLSRet = 0 ] && [ "$http_code" = "404" ]; then
@@ -2007,7 +2009,7 @@ then
         cron=''
         cron=`echo "$vc1 $vc2 $vc3 $vc4 $vc5"`
 
-        echo "Configuring cron job for RFCbase.sh" >> $RFC_LOG_FILE
+        rfcLogging "RFC_TM_Track : Configuring cron job for RFCbase.sh, cron = $cron"
         if [ ! -f /lib/rdk/cronjobs_update.sh ]; then
             crontab -l -c /var/spool/cron/ > $current_cron_file
             sed -i '/[A-Za-z0-9]*RFCbase.sh[A-Za-z0-9]*/d' $current_cron_file

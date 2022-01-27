@@ -2016,7 +2016,11 @@ then
 
         rfcLogging "RFC_TM_Track : Configuring cron job for RFCbase.sh, cron = $cron"
         if [ ! -f /lib/rdk/cronjobs_update.sh ]; then
-            crontab -l -c /var/spool/cron/ > $current_cron_file
+            if [ "$DEVICE_TYPE" != "broadband" ]; then
+                crontab -l -c /var/spool/cron/ > $current_cron_file
+            else
+                crontab -l -c /var/spool/cron/crontabs/ > $current_cron_file
+            fi
             sed -i '/[A-Za-z0-9]*RFCbase.sh[A-Za-z0-9]*/d' $current_cron_file
         fi
 
@@ -2036,7 +2040,11 @@ then
 
         if [ ! -f /lib/rdk/cronjobs_update.sh ]; then
             if [ $cron_update -eq 1 ]; then
-                crontab $current_cron_file -c /var/spool/cron/
+                if [ "$DEVICE_TYPE" != "broadband" ]; then
+                    crontab $current_cron_file -c /var/spool/cron/
+                else
+                    crontab $current_cron_file -c /var/spool/cron/crontabs/
+                fi
             fi
         fi
 

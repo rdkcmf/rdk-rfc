@@ -976,7 +976,7 @@ rfcSetHTValue ()
 rfcSetHashAndTime ()
 {
     # Store and log hash data
-    valueHash=`grep configSetHash /tmp/curl_header | awk '{print $2}'`
+    valueHash=`grep configSetHash /tmp/curl_header | awk '{print $2}' | sed 's/\r//'`
     valueTime="$(date +%s )"
 
     rfcSetHTValue $valueHash  $valueTime

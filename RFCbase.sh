@@ -31,7 +31,6 @@
 . /etc/include.properties
 . /etc/device.properties
 
-
 ## DEVICE_TYPE definitions from device.properties
 ##  "$DEVICE_TYPE" = "mediaclient"
 ##  DEVICE_TYPE=hybrid
@@ -39,6 +38,12 @@
 ##   "$DEVICE_TYPE" = "rmfstreamer"
 ##  "$DEVICE_TYPE" = "broadband"
 ##
+
+if [ -f /etc/waninfo.sh ]; then
+    . /etc/waninfo.sh
+    EROUTER_INTERFACE=$(getWanInterfaceName)
+fi
+
 T2_MSG_CLIENT=/usr/bin/telemetry2_0_client
 
 t2CountNotify() {

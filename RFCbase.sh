@@ -1580,6 +1580,23 @@ sendHttpDirectRequest()
         done
     fi
 }
+
+checkCodebigAccess() 
+{
+    local request_type=8
+    if [ ! -z $rfcSelectorSlot ]; then
+        request_type=$rfcSelectorSlot
+    fi
+    local retval=0
+    eval "configparamgen $request_type temp > /dev/null 2>&1"
+    local checkExitcode=$?
+    rfcLogging "Exit code for codebigcheck $checkExitcode"
+    if [ $checkExitcode -eq 255 ]; then
+        retval=1
+    fi
+    return $retval
+}
+
 #####################################################################
 
 #####################################################################
@@ -1629,7 +1646,10 @@ CallXconf()
         else
             if [ $UseCodebig -eq 1 ]; then
                 rfcLogging "CallXconf: Codebig is enabled UseCodebig=$UseCodebig"
-                if [ "$DEVICE_TYPE" == "mediaclient" ]; then
+		rfcLogging "Check if codebig is applicable for the Device"
+		checkCodebigAccess
+		codebigapplicable=$?
+		if [ "$DEVICE_TYPE" == "mediaclient" -a $codebigapplicable -eq 0 ]; then
                     # Use Codebig connection connection on XI platforms
                     sendHttpCBRequest
                     if [ $cbretSx -ne 0 ]; then
@@ -1656,7 +1676,10 @@ CallXconf()
                 sendHttpDirectRequest
                 #If sendHttpRequestToServer Direct method fails
                 if [ $directretSx -ne 0 ]; then
-                    if [ "$DEVICE_TYPE" == "mediaclient" ]; then
+		    rfcLogging "Check if codebig is applicable for the Device"
+                    checkCodebigAccess
+                    codebigapplicable=$?
+                    if [ "$DEVICE_TYPE" == "mediaclient" -a $codebigapplicable -eq 0 ]; then
                         rfcLogging "CallXconf: sendHttpDirectRequest Direct connection failed $directretSx"
                         UseCodebig=1
                         sendHttpCBRequest
@@ -1675,6 +1698,7 @@ CallXconf()
                             fi
                         fi
                     else
+                        rfcLogging "CallXconf: Codebig RFC connection not supported"
                         rfcLogging "CallXconf: sendHttpDirectRequest Direct connection failed $directretSx"
                     fi
                 else

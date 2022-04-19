@@ -35,6 +35,9 @@ using namespace std;
 #define RFCDEFAULTS_FILE "/tmp/rfcdefaults.ini"
 #define RFCDEFAULTS_ETC_DIR "/etc/rfcdefaults/"
 
+#define CONNECTION_TIMEOUT 5
+#define TRANSFER_TIMEOUT 10
+
 static const char *url = "http://127.0.0.1:11999";
 static bool tr69hostif_http_server_ready = false;
 
@@ -313,6 +316,8 @@ WDMP_STATUS getRFCParameter(char *pcCallerID, const char* pcParameterName, RFC_P
        curl_easy_setopt(curl_handle, CURLOPT_FOLLOWLOCATION, 1);
        curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, writeCurlResponse);
        curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, &response);
+       curl_easy_setopt(curl_handle, CURLOPT_CONNECTTIMEOUT, CONNECTION_TIMEOUT);
+       curl_easy_setopt(curl_handle, CURLOPT_TIMEOUT, TRANSFER_TIMEOUT);
 
        res = curl_easy_perform(curl_handle);
        curl_easy_getinfo(curl_handle, CURLINFO_RESPONSE_CODE, &http_code);

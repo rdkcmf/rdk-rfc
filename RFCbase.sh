@@ -31,7 +31,10 @@
 . /etc/include.properties
 . /etc/device.properties
 
-source /lib/rdk/t2Shared_api.sh
+if [ "$DEVICE_TYPE" != "XHC1" ] && [ -f /lib/rdk/t2Shared_api.sh ]; then
+    source /lib/rdk/t2Shared_api.sh
+fi
+
 ## DEVICE_TYPE definitions from device.properties
 ##  "$DEVICE_TYPE" = "mediaclient"
 ##  DEVICE_TYPE=hybrid

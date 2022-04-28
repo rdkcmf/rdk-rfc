@@ -462,7 +462,9 @@ getFeatures()
         cp $RFC_TMP_PATH/rfcFeature.list $RFC_PATH/rfcFeature.list
 
         rfcLogging "[Features Enabled]-[STAGING]: `cat $RFC_PATH/rfcFeature.list`"
-        t2ValNotify "rfc_split" "`cat $RFC_PATH/rfcFeature.list`"
+        if [ "$DEVICE_TYPE" != "XHC1" ]; then
+            t2ValNotify "rfc_split" "`cat $RFC_PATH/rfcFeature.list`"
+        fi
     else
         rfcLogging "$FILENAME not found."
         return 1
@@ -1266,7 +1268,9 @@ sendHttpRequestToServer()
     case $TLSRet in
         35|51|53|54|58|59|60|64|66|77|80|82|83|90|91)
             rfcLogging "RFC: HTTPS $TLSFLAG failed to connect to RFC server with curl error code $TLSRet"
-            t2ValNotify "RFCCurlFail_split" "$TLSRet"
+            if [ "$DEVICE_TYPE" != "XHC1" ]; then
+                t2ValNotify "RFCCurlFail_split" "$TLSRet"
+            fi
             ;;
     esac
 
@@ -1304,7 +1308,9 @@ sendHttpRequestToServer()
         resp=0
         echo 1 > $RFCFLAG
         rfcLogging "[Features Enabled]-[ACTIVE]: `cat $RFC_PATH/rfcFeature.list`"
-        t2ValNotify "rfc_split" "`cat $RFC_PATH/rfcFeature.list`"
+        if [ "$DEVICE_TYPE" != "XHC1" ]; then
+            t2ValNotify "rfc_split" "`cat $RFC_PATH/rfcFeature.list`"
+        fi
 
     elif [ $retSs -ne 0 -o "$http_code" != "200" ] ; then   # check for retSs is probably superfluous
         rfcLogging "HTTP request failed"

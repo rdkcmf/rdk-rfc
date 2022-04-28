@@ -1204,6 +1204,10 @@ sendHttpRequestToServer()
         valueTime="0"
     fi
 
+    if [ "$rfcPartnerId" = "Unknown" ] || [ "$rfcAccountId" = "Unknown" ] || [ "$rfcPartnerId" = "unknown" ] || [ "$rfcAccountId" = "unknown" ]; then
+        valueHash="OVERRIDE_HASH"
+    fi
+
     mTlsEnable="false"
     if [ "$DEVICE_TYPE" = "hybrid" ] || [ "$DEVICE_TYPE" = "mediaclient" ]; then
         mTlsEnable=`tr181Set Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.MTLS.mTlsXcSsr.Enable 2>&1 > /dev/null`
@@ -1764,6 +1768,13 @@ parseConfigValue()
                 paramSet=`$RFC_SET $paramName $paramType "$configValue" | grep succeed| tr -s ' ' `
                 if [ -n "$paramSet" ]; then
                     rfcLogging "RFC:  updated for $paramName from value old=$paramValue, to new=$configValue"
+
+                    if [ "$paramName" = "Device.DeviceInfo.X_RDKCENTRAL-COM_Syndication.PartnerId" ]; then
+                        if [ "$paramValue" = "unknown"] || [ "$paramValue" = "Unknown"]; then
+                            RebootValue=1
+                        fi
+                    fi
+
                     if [ $RebootValue -eq 1 ]; then
                         if [ -n "$RfcRebootCronNeeded" ]; then
                             RfcRebootCronNeeded=1;

@@ -31,6 +31,7 @@
 . /etc/include.properties
 . /etc/device.properties
 
+source /lib/rdk/t2Shared_api.sh
 ## DEVICE_TYPE definitions from device.properties
 ##  "$DEVICE_TYPE" = "mediaclient"
 ##  DEVICE_TYPE=hybrid
@@ -47,22 +48,7 @@ if [ -f /etc/waninfo.sh ]; then
     . /etc/waninfo.sh
     EROUTER_INTERFACE=$(getWanInterfaceName)
 fi
-T2_MSG_CLIENT=/usr/bin/telemetry2_0_client
 
-t2CountNotify() {
-    if [ -f $T2_MSG_CLIENT ]; then
-        marker=$1
-        $T2_MSG_CLIENT  "$marker" "1"
-    fi
-}
-
-t2ValNotify() {
-    if [ -f $T2_MSG_CLIENT ]; then
-        marker=$1
-        shift
-        $T2_MSG_CLIENT "$marker" "$*"
-    fi
-}
 #MN2
 if [ "$DEVICE_TYPE" = "broadband" ]; then
     source /etc/log_timestamp.sh  #?
@@ -1272,7 +1258,8 @@ sendHttpRequestToServer()
 
     case $TLSRet in
         35|51|53|54|58|59|60|64|66|77|80|82|83|90|91)
-            rfcLogging "RFC: HTTPS $TLSFLAG failed to connect to $1 server with curl error code $TLSRet"
+            rfcLogging "RFC: HTTPS $TLSFLAG failed to connect to RFC server with curl error code $TLSRet"
+            t2ValNotify "RFCCurlFail_split" "$TLSRet"
             ;;
     esac
 

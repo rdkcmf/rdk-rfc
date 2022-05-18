@@ -66,6 +66,7 @@ else
     fi
 fi
 
+partnerId="$(getPartnerId)"
 
 if [ -z $PERSISTENT_PATH ]; then
     if [ "$DEVICE_TYPE" = "broadband" ]; then
@@ -141,6 +142,13 @@ if [ ! -f /etc/os-release ]; then
     IARM_EVENT_BINARY_LOCATION=/usr/local/bin
 fi
 
+CERT=""
+if [ -f $RDK_PATH/mtlsUtils.sh ]; then
+     . $RDK_PATH/mtlsUtils.sh
+      echo "RFCbase: calling getMtlsCreds" >> $RFC_LOG_FILE
+      CERT=`getMtlsCreds RFCBase.sh`
+fi
+
 eventSender()
 {
     if [ -f $IARM_EVENT_BINARY_LOCATION/IARM_event_sender ];
@@ -174,8 +182,11 @@ FILENAME='/tmp/rfc-parsed.txt'
 
 DCM_PARSER_RESPONSE="/tmp/rfc_configdata.txt"
 
-URL="$RFC_CONFIG_SERVER_URL"
-echo "Initial URL: $URL"
+if [ "$DEVICE_TYPE" != "broadband" ]
+then
+  URL="$RFC_CONFIG_SERVER_URL"
+  echo "Initial URL: $URL"
+fi
 
 # File to save http code
 HTTP_CODE="/tmp/rfc_curl_httpcode"
@@ -1194,6 +1205,19 @@ sendHttpRequestToServer()
         fi
     fi
 
+     #Partner sky-uk should impose MTLS only connection
+    if [ "$DEVICE_TYPE" = "broadband" ] && [ "$partnerId" = "sky-uk" ]
+    then
+        rfcLogging "Check MTLS only for partner sky-uk"
+        if [ "$CERT" = "" ]
+        then
+           rfcLogging "getMtlsCreds failed for sky-uk. Exiting"
+           exit
+        else
+           rfcLogging "getMtlsCreds returned $CERT"
+        fi
+    fi
+
     if [ "$TryWithCodeBig" = "1" ]; then
         rfcLogging "Attempt to get RFC settings"
 
@@ -1212,24 +1236,8 @@ sendHttpRequestToServer()
         if [ "$mTLS_RPI" == "true" ] ; then
             CURL_CMD="curl --cert-type pem --cert /etc/ssl/certs/refplat-xconf-cpe-clnt.xcal.tv.cert.pem --key /tmp/xconf-file.tmp -w '%{http_code}\n'  -D "/tmp/curl_header"  "$IF_FLAG" --connect-timeout $timeout -m $timeout "$TLSFLAG" -H "configsethash:$valueHash" -H "configsettime:$valueTime" -o  \"$FILENAME\" '$URL$JSONSTR'"
         else
-            if [ $useXpkiMtlsLogupload == "true" ]; then
-                echo "RFC requires Mutual Authentication" >> $RFC_LOG_FILE
-                echo "XpkiMtlsBasedLogUpload true for RFC" >> $RFC_LOG_FILE
-                CURL_CMD="curl --cert-type P12 --cert $CERT_PATH:$(/usr/bin/rdkssacli "{STOR=GET,SRC=kquhqtoczcbx,DST=/dev/stdout}") -w '%{http_code}\n'  -D "/tmp/curl_header" "$IF_FLAG" --connect-timeout $timeout -m $timeout "$TLSFLAG"  -H "configsethash:$valueHash" -H "configsettime:$valueTime" -o  \"$FILENAME\" '$URL$JSONSTR'"
-            elif [ -f /etc/ssl/certs/staticXpkiCrt.pk12 ] && [ -f /usr/bin/GetConfigFile ]; then
-                ID="/tmp/.cfgStaticxpki"
-                if [ ! -f "$ID" ]; then
-                    GetConfigFile $ID
-                fi
-                if [ ! -f "$ID" ]; then
-                    echo "Error: Getconfig file failed"
-                fi
-                echo "StaticXpkiMtlsBasedLogUpload true for RFC" >> $RFC_LOG_FILE
-                CURL_CMD="curl  --cert-type P12 --cert /etc/ssl/certs/staticXpkiCrt.pk12:$(cat $ID) -w '%{http_code}\n'  -D "/tmp/curl_header" "$IF_FLAG" --connect-timeout $timeout -m $timeout "$TLSFLAG"  -H "configsethash:$valueHash" -H "configsettime:$valueTime" -o  \"$FILENAME\" '$URL$JSONSTR'"
-            else
-                echo "no xpki used for RFC" >> $RFC_LOG_FILE
-                CURL_CMD="curl -w '%{http_code}\n'  -D "/tmp/curl_header" "$IF_FLAG" --connect-timeout $timeout -m $timeout "$TLSFLAG"  -H "configsethash:$valueHash" -H "configsettime:$valueTime" -o  \"$FILENAME\" '$URL$JSONSTR'"
-            fi    
+            echo "no xpki used for RFC" >> $RFC_LOG_FILE
+            CURL_CMD="curl -w '%{http_code}\n'  -D "/tmp/curl_header" "$IF_FLAG" --connect-timeout $timeout -m $timeout "$TLSFLAG"  -H "configsethash:$valueHash" -H "configsettime:$valueTime" -o  \"$FILENAME\" '$URL$JSONSTR'"
         fi
 
         if [ -f $EnableOCSPStapling ] || [ -f $EnableOCSP ]; then
@@ -1918,7 +1926,36 @@ fi
 
 rfcSelectUrl="$RFC_CONFIG_SERVER_URL"
 rfcSelectorSlot="$RFC_SLOT" # values are "8" for "prod", "16" for "ci", "19" for "automation"
-URL="$RFC_CONFIG_SERVER_URL"
+# Default RFC url
+# Broadband devices will fetch default URL from bootstrap json as 
+# EU partners using different URL
+if [ "$DEVICE_TYPE" = "broadband" ]
+then
+  tmp_URL="$(dmcli eRT getv Device.DeviceInfo.X_RDKCENTRAL-COM_Syndication.XconfURL | grep string | cut -d":" -f3- | cut -d" " -f2- | tr -d ' ')"
+  if [ "$tmp_URL" != "" ]
+  then
+     if [ "$partnerId" = "sky-uk" ]
+     then
+        URL="${tmp_URL}/featureControl/getSettings"
+     else
+        URL="${tmp_URL}:443/featureControl/getSettings"
+     fi
+  else
+     if [ "$partnerId" != "sky-uk" ]
+     then
+         URL="$RFC_CONFIG_SERVER_URL"
+     else
+         URL="$RFC_CONFIG_SERVER_URL_EU"
+     fi
+     rfcLogging "RFC: TR181 URL is empty"
+     #This is done to satisfy existing code and use TR181 default value
+     RFC_CONFIG_SERVER_URL="$URL"
+  fi
+  echo "Initial URL: $URL"
+else
+  URL="$RFC_CONFIG_SERVER_URL"
+fi
+
 rfcSelectUrl="$URL"
 
 if [ "$rfcState" == "LOCAL" ]; then

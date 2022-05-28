@@ -1931,27 +1931,37 @@ rfcSelectorSlot="$RFC_SLOT" # values are "8" for "prod", "16" for "ci", "19" for
 # EU partners using different URL
 if [ "$DEVICE_TYPE" = "broadband" ]
 then
-  tmp_URL="$(dmcli eRT getv Device.DeviceInfo.X_RDKCENTRAL-COM_Syndication.XconfURL | grep string | cut -d":" -f3- | cut -d" " -f2- | tr -d ' ')"
-  if [ "$tmp_URL" != "" ]
+  if [ "$rfcState" != "LOCAL" ]
   then
-     if [ "$partnerId" = "sky-uk" ]
+     tmp_URL="$(dmcli eRT getv Device.DeviceInfo.X_RDKCENTRAL-COM_Syndication.XconfURL | grep string | cut -d":" -f3- | cut -d" " -f2- | tr -d ' ')"
+     if [ "$tmp_URL" != "" ]
      then
-        URL="${tmp_URL}/featureControl/getSettings"
+        if [ "$partnerId" = "sky-uk" ]
+        then
+           URL="${tmp_URL}/featureControl/getSettings"
+        else
+           URL="${tmp_URL}:443/featureControl/getSettings"
+        fi
      else
-        URL="${tmp_URL}:443/featureControl/getSettings"
+        if [ "$partnerId" != "sky-uk" ]
+        then
+           URL="$RFC_CONFIG_SERVER_URL"
+        else
+           URL="$RFC_CONFIG_SERVER_URL_EU"
+        fi
+        rfcLogging "RFC: TR181 URL is empty"
+        #This is done to satisfy existing code and use TR181 default value
+        RFC_CONFIG_SERVER_URL="$URL"
      fi
+     echo "Initial URL: $URL"
   else
      if [ "$partnerId" != "sky-uk" ]
      then
-         URL="$RFC_CONFIG_SERVER_URL"
+        URL="$RFC_CONFIG_SERVER_URL"
      else
-         URL="$RFC_CONFIG_SERVER_URL_EU"
+        URL="$RFC_CONFIG_SERVER_URL_EU"
      fi
-     rfcLogging "RFC: TR181 URL is empty"
-     #This is done to satisfy existing code and use TR181 default value
-     RFC_CONFIG_SERVER_URL="$URL"
   fi
-  echo "Initial URL: $URL"
 else
   URL="$RFC_CONFIG_SERVER_URL"
 fi

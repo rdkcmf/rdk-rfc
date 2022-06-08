@@ -154,6 +154,14 @@ if [ "$DEVICE_TYPE" != "XHC1" ]; then
     fi
 fi
 
+if [ "$CERT" != "" ] && [ "$DEVICE_TYPE" = "broadband" ]
+then
+   rfcLogging "MTLS enabled"
+elif [ "$CERT" = "" ] && [ "$DEVICE_TYPE" = "broadband" ]
+then
+   rfcLogging "MTLS not enabled"
+fi
+
 eventSender()
 {
     if [ -f $IARM_EVENT_BINARY_LOCATION/IARM_event_sender ];
@@ -1269,10 +1277,19 @@ sendHttpRequestToServer()
     result= eval $CURL_CMD > $HTTP_CODE
     TLSRet=$?
 
-    if [ -f /tmp/.cfgStaticxpki ];then
-        echo "MTLS enabled" >> $RFC_LOG_FILE
-    else
-        echo "MTLS not enabled" >> $RFC_LOG_FILE
+    noMtlsCheck=0
+    if [ "$DEVICE_TYPE" = "XHC1" ] || [ "$DEVICE_TYPE" = "broadband" ]
+    then
+       noMtlsCheck=1
+    fi
+
+    if [ "$noMtlsCheck" = "0" ]
+    then
+        if [ -f /tmp/.cfgStaticxpki ];then
+            rfcLogging "MTLS enabled"
+        else
+            rfcLogging "MTLS not enabled"
+        fi
     fi
 
     case $TLSRet in

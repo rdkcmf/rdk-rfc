@@ -146,10 +146,12 @@ if [ ! -f /etc/os-release ]; then
 fi
 
 CERT=""
-if [ -f $RDK_PATH/mtlsUtils.sh ]; then
-     . $RDK_PATH/mtlsUtils.sh
-      echo "RFCbase: calling getMtlsCreds" >> $RFC_LOG_FILE
-      CERT=`getMtlsCreds RFCBase.sh`
+if [ "$DEVICE_TYPE" != "XHC1" ]; then
+    if [ -f $RDK_PATH/mtlsUtils.sh ]; then
+        . $RDK_PATH/mtlsUtils.sh
+        echo "RFCbase: calling getMtlsCreds" >> $RFC_LOG_FILE
+        CERT=`getMtlsCreds RFCBase.sh`
+    fi
 fi
 
 eventSender()
@@ -264,6 +266,7 @@ if [ -f /usr/bin/rdkssacli ]; then
         fi
     fi
 fi
+
 if [ "$DEVICE_TYPE" = "XHC1" ] || [ "$DEVICE_TYPE" = "mediaclient" ]; then
     RDK_ACCOUNT_ID="Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AccountInfo.AccountID"
     RDK_ACCOUNT_HASH="Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.MD5AccountHash"

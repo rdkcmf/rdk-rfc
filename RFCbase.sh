@@ -145,6 +145,17 @@ if [ ! -f /etc/os-release ]; then
     IARM_EVENT_BINARY_LOCATION=/usr/local/bin
 fi
 
+#####################################################################
+rfcLogging ()
+{
+    if [ "$DEVICE_TYPE" = "broadband" ]; then
+        echo_t "[RFC]:: $1" >> $RFC_LOG_FILE
+    else
+        echo "`/bin/timestamp` [RFC]:: $1" >> $RFC_LOG_FILE
+    fi
+}
+#####################################################################
+
 CERT=""
 if [ "$DEVICE_TYPE" != "XHC1" ]; then
     if [ -f $RDK_PATH/mtlsUtils.sh ]; then
@@ -1425,17 +1436,6 @@ sendHttpRequestToServer()
     fi
 
     return $resp
-}
-#####################################################################
-
-#####################################################################
-rfcLogging ()
-{
-    if [ "$DEVICE_TYPE" = "broadband" ]; then
-        echo_t "[RFC]:: $1" >> $RFC_LOG_FILE
-    else
-        echo "`/bin/timestamp` [RFC]:: $1" >> $RFC_LOG_FILE
-    fi
 }
 #####################################################################
 

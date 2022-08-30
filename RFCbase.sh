@@ -190,8 +190,8 @@ if [ "$DEVICE_TYPE" = "broadband" ]; then
     RFC_GET="dmcli eRT getv"
     RFC_SET="dmcli eRT setv"
 elif [ "$DEVICE_TYPE" = "XHC1" ]; then
-    RFC_GET="dmcli -g"
-    RFC_SET="dmcli -s"
+    RFC_GET="rbuscli getv"
+    RFC_SET="rbuscli setv"
 else
     RFC_GET="tr181 "
     RFC_SET="tr181 -s -t s -n rfc"
@@ -398,10 +398,8 @@ rfcGet () # $1 Name
 
 rfcSet () # $1 Name $2 Type $3 Value
 {
-    if [ "$DEVICE_TYPE" = "broadband" ]; then
+    if [ "$DEVICE_TYPE" = "broadband" ] || [ "$DEVICE_TYPE" = "XHC1" ];  then
         $RFC_SET $1 $2 $3
-    elif [ "$DEVICE_TYPE" = "XHC1" ]; then
-        $RFC_SET $1="$3"
     else
         $RFC_SET -v $3 $1
     fi
@@ -923,7 +921,7 @@ processJsonResponseV()
                                                 rfcLogging "RFC: !!! EMPTY value for $paramName is rejected."
                                             fi
                                     else
-                                        $RFC_SET $paramName=$configValue >> $RFC_LOG_FILE
+                                        $RFC_SET $paramName string $configValue >> $RFC_LOG_FILE
                                         rfcLogging "RFC:  updated for $paramName from value old=$paramValue, to new=$configValue"
                                     fi
                                 else
@@ -1040,7 +1038,7 @@ rfcStashStoreParams ()
         stashAccountId=paramValue=`grep "value:" /tmp/.paramRFC | cut -d':' -f3 | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'`
     elif [ "$DEVICE_TYPE" = "XHC1" ]; then
         $RFC_GET Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AccountInfo.AccountID  > /tmp/.paramRFC
-        stashAccountId=`grep "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AccountInfo.AccountID =" /tmp/.paramRFC | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | cut -d' ' -f3`
+        stashAccountId=`grep "Value" /tmp/.paramRFC | cut -d':' -f2 | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'`
     else
         stashAccountId=`$RFC_GET Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AccountInfo.AccountID  2>&1 > /dev/null`
     fi
@@ -1054,7 +1052,7 @@ rfcStashRetrieveParams ()
 
         paramSet=`$RFC_SET Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AccountInfo.AccountID string $stashAccountId | grep succeed| tr -s ' ' `
     elif [ "$DEVICE_TYPE" = "XHC1" ]; then
-        $RFC_SET Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AccountInfo.AccountID="$stashAccountId" >> $RFC_LOG_FILE
+        $RFC_SET Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AccountInfo.AccountID string $stashAccountId >> $RFC_LOG_FILE
     else
         $RFC_SET -v "$stashAccountId" Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.AccountInfo.AccountID  >> $RFC_LOG_FILE
     fi

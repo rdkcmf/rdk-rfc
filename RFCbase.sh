@@ -357,6 +357,13 @@ getFWVersion()
     fi
 }
 
+## Serial number needed for XLE
+getSerialNum()
+{
+    serialNumber=`/usr/sbin/deviceinfo.sh -sn |  sed -e 's/\r//g' `
+    echo $serialNumber
+}
+
 ## Identifies whether it is a VBN or PROD build
 getBuildType()
 {
@@ -1164,7 +1171,11 @@ sendHttpRequestToServer()
     #Create json string
     if [ "$DEVICE_TYPE" = "broadband" ]; then
         rfcGetAccoutId
-        JSONSTR='estbMacAddress='$(getErouterMacAddress)'&firmwareVersion='$(getFWVersion)'&env='$(getBuildType)'&model='$(getModel)'&ecmMacAddress='$(getMacAddress)'&controllerId='$(getControllerId)'&channelMapId='$(getChannelMapId)'&vodId='$(getVODId)'&partnerId='$(getPartnerId)'&accountId='$rfcAccountId'&experience='$(getExperience)'&version=2'
+	if [ $MODEL_NUM = "WNXL11BWL" ]; then
+		JSONSTR='estbMacAddress='$(getErouterMacAddress)'&firmwareVersion='$(getFWVersion)'&env='$(getBuildType)'&model='$(getModel)'&ecmMacAddress='$(getMacAddress)'&controllerId='$(getControllerId)'&channelMapId='$(getChannelMapId)'&vodId='$(getVODId)'&partnerId='$(getPartnerId)'&accountId='$rfcAccountId'&accountMgmt=xpc&serialNum='$(getSerialNum)'&experience='$(getExperience)'&version=2'
+	else
+		JSONSTR='estbMacAddress='$(getErouterMacAddress)'&firmwareVersion='$(getFWVersion)'&env='$(getBuildType)'&model='$(getModel)'&ecmMacAddress='$(getMacAddress)'&controllerId='$(getControllerId)'&channelMapId='$(getChannelMapId)'&vodId='$(getVODId)'&partnerId='$(getPartnerId)'&accountId='$rfcAccountId'&experience='$(getExperience)'&version=2'
+	fi
     elif [ "$DEVICE_TYPE" = "XHC1" ]; then
         JSONSTR='estbMacAddress='$(getEstbMacAddress)'&firmwareVersion='$(getFWVersion)'&env='$(getBuildType)'&model='$(getModel)'&accountHash='$(getAccountHash)'&partnerId='$(getPartnerId)'&accountId='$(getAccountId)'&experience='$(getExperience)'&version=2'
     elif [ "$DEVICE_TYPE" = "mediaclient" ]; then

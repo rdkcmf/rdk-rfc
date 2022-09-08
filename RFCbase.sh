@@ -1767,6 +1767,14 @@ parseConfigValue()
         #dmcli GET
         $RFC_GET $paramName  > /tmp/.paramRFC
 
+	#RDKB-44205 - Enable Refactor, Xupnp in XB7 WFO builds,It is enabled by default, do not set to false with RFC settings
+        if [ "$WanFailOverSupportEnable" = "true" ]; then
+           if [ "$paramName" == "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.UPnP.Refactor.Enable" ] || [ "$paramName" == "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.Xupnp" ]; then
+                 rfcLogging "Parameter $paramName is not applied in WFO builds"
+                 return 0
+           fi
+        fi
+
         paramType=`grep "type" /tmp/.paramRFC | tr -s ' ' |cut -f3 -d" " | tr , " "`
         if [ -n "$paramType" ]; then
             rfcLogging "paramType is $paramType"

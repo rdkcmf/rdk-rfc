@@ -253,6 +253,9 @@ XCONF_URL_TR181_NAME="Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Control.XconfUrl"
 
 TLSFLAG="--tlsv1.2"
 if [ "$DEVICE_TYPE" = "broadband" ]; then
+    if [ -f /etc/waninfo.sh ]; then
+        EROUTER_INTERFACE=$(getWanInterfaceName)
+    fi
     IF_FLAG="--interface $EROUTER_INTERFACE"
 else
     IF_FLAG=""

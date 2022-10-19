@@ -229,7 +229,7 @@ int getRFCParameter(const char* pcParameterName, RFC_ParamData_t *pstParam)
 
 #else
  
-WDMP_STATUS getRFCParameter(char *pcCallerID, const char* pcParameterName, RFC_ParamData_t *pstParam)
+WDMP_STATUS getRFCParameter(const char *pcCallerID, const char* pcParameterName, RFC_ParamData_t *pstParam)
 {
 #ifdef TEMP_LOGGING
    openLogFile();
@@ -405,7 +405,7 @@ WDMP_STATUS getRFCParameter(char *pcCallerID, const char* pcParameterName, RFC_P
    return ret;
 }
 
-WDMP_STATUS setRFCParameter(char *pcCallerID, const char* pcParameterName, const char* pcParameterValue, DATA_TYPE eDataType)
+WDMP_STATUS setRFCParameter(const char *pcCallerID, const char* pcParameterName, const char* pcParameterValue, DATA_TYPE eDataType)
 {
 #ifdef TEMP_LOGGING 
    openLogFile();

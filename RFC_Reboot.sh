@@ -61,6 +61,11 @@ elif [ "$DEVICE_TYPE" = "broadband" ]; then
         echo_t "[RFC_Reboot.sh] setting last reboot to rfc_reboot" >> $LOG_FILE
         setRebootreason rfc_reboot 1
 
+	isWanLinkHealEnabled=`syscfg get wanlinkheal`
+	if [ "x$isWanLinkHealEnabled" == "xtrue" ];then
+	    /usr/ccsp/tad/check_gw_health.sh store-health
+	fi
+
         #take log back up and reboot
 
         echo_t "[RFC_Reboot.sh] take log back up and reboot" >> $LOG_FILE

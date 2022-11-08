@@ -112,7 +112,7 @@ tr181ErrorCode_t getParam(char *pcCallerID, const char* pcParameterName, TR181_P
       return tr181Success;
    }
 
-   return tr181InternalError;
+   return getErrorCode(wdmpStatus);
 }
 
 tr181ErrorCode_t setParam(char *pcCallerID, const char* pcParameterName, const char* pcParameterValue)
@@ -121,7 +121,7 @@ tr181ErrorCode_t setParam(char *pcCallerID, const char* pcParameterName, const c
    if (wdmpStatus == WDMP_SUCCESS)
       return tr181Success;
 
-   return tr181InternalError;
+   return getErrorCode(wdmpStatus);
 }
 
 tr181ErrorCode_t clearParam(char *pcCallerID, const char* pcParameterName)
@@ -130,7 +130,7 @@ tr181ErrorCode_t clearParam(char *pcCallerID, const char* pcParameterName)
    if (wdmpStatus == WDMP_SUCCESS)
       return tr181Success;
 
-   return tr181InternalError;
+   return getErrorCode(wdmpStatus);
 }
 
 const char * getTR181ErrorString(tr181ErrorCode_t code)

@@ -1876,8 +1876,6 @@ interrupt_rfc_onabort()
 
     rm -rf  $RFC_SERVICE_LOCK
 
-    sh /lib/rdk/maintenanceTrapEventNotifier.sh 1 &
-
    trap - SIGABRT
 
     exit

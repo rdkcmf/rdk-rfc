@@ -734,6 +734,9 @@ processJsonResponseV()
                             $RFC_SET -v true Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Control.ClearDB >> $RFC_LOG_FILE
                             $RFC_SET -v true Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Bootstrap.Control.ClearDB >> $RFC_LOG_FILE
                             $RFC_SET -v "$(date +%s )" Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Control.ConfigChangeTime >> $RFC_LOG_FILE
+                        else
+                            echo "RFC: clearing tr181 store"  >> $RFC_LOG_FILE
+                            rm -rf $TR181_STORE_FILENAME
                         fi
 
                         # Now retrieve parameters that must persist

@@ -153,20 +153,18 @@ rfcLogging ()
 #####################################################################
 
 CERT=""
-if [ "$DEVICE_TYPE" != "XHC1" ]; then
-    if [ -f $RDK_PATH/mtlsUtils.sh ]; then
-        . $RDK_PATH/mtlsUtils.sh
-        echo "RFCbase: calling getMtlsCreds" >> $RFC_LOG_FILE
-        CERT=`getMtlsCreds RFCBase.sh`
-    fi
+if [ -f $RDK_PATH/mtlsUtils.sh ]; then
+    . $RDK_PATH/mtlsUtils.sh
+    echo "RFCbase: calling getMtlsCreds" >> $RFC_LOG_FILE
+    CERT=`getMtlsCreds RFCBase.sh`
 fi
 
 if [ "$CERT" != "" ] && [ "$DEVICE_TYPE" = "broadband" ]
 then
-   rfcLogging "MTLS enabled"
+    rfcLogging "MTLS enabled"
 elif [ "$CERT" = "" ] && [ "$DEVICE_TYPE" = "broadband" ]
 then
-   rfcLogging "MTLS not enabled"
+    rfcLogging "MTLS not enabled"
 fi
 
 eventSender()
@@ -1930,7 +1928,7 @@ fi
 
 if [ "$DEVICE_TYPE" != "broadband" ]; then
     if [ "$DEVICE_TYPE" = "XHC1" ]; then
-        rfcLogging "Waiting 5 minutes before attempting to query xconf"
+        rfcLogging "Waiting one minute before attempting to query xconf"
         sleep  60
     else
         route_counter=0
